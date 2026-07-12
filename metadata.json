@@ -1,0 +1,6 @@
+{
+  "name": "International Money Transfer Receipt & Emailer",
+  "description": "Generate international bank transfer receipts in over 2,000 currencies and send real-time notification emails to both sender and beneficiary using Brevo API.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
