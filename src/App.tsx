@@ -213,7 +213,14 @@ export default function App() {
 
   // Update records on new successful transfer dispatch
   const handleTransferSuccess = (newTx: Transaction) => {
-    setTransactions((prev) => [newTx, ...prev]);
+    setTransactions((prev) => {
+      const exists = prev.some((t) => t.id === newTx.id);
+      if (exists) {
+        return prev.map((t) => (t.id === newTx.id ? newTx : t));
+      } else {
+        return [newTx, ...prev];
+      }
+    });
     setActiveTx(newTx); // Automatically open receipt review
   };
 
@@ -462,7 +469,7 @@ export default function App() {
                   <div>
                     <div><span className="text-slate-400">From:</span> {activeTx.bankName} Alert Service</div>
                     <div className="mt-1">
-                      <span className="text-slate-400">To:</span> {previewRole === "sender" ? activeTx.sender.email : activeTx.receiver.email}
+                      <span className="text-slate-400">To:</span> {previewRole === "sender" ? activeTx.sender.email : <span className="italic text-slate-300 font-normal">[Invisible for Privacy]</span>}
                     </div>
                   </div>
                   <div className="text-right">
@@ -491,6 +498,14 @@ export default function App() {
                       <span className="font-bold tracking-tight text-sm">🏦 {activeTx.bankName}</span>
                       <span className="text-[9px] font-mono text-slate-400">Official Receipt</span>
                     </div>
+
+                    {/* Receiver warning insert inside body */}
+                    {previewRole === "receiver" && activeTx.receiver.redBoxMessage && (
+                      <div className="bg-rose-50 border-2 border-rose-500 rounded-xl p-4 font-sans text-left">
+                        <h4 className="text-rose-700 font-extrabold text-xs mb-1">⚠️ Notification for Receiver</h4>
+                        <p className="text-rose-800 font-semibold leading-relaxed text-xs">{activeTx.receiver.redBoxMessage}</p>
+                      </div>
+                    )}
 
                     {/* Transaction Hero */}
                     <div className="text-center py-4 bg-slate-50 rounded-xl border border-gray-100">
@@ -533,6 +548,13 @@ export default function App() {
                         <span className="text-gray-400">Full Name</span>
                         <span className="font-semibold text-right text-gray-800">{activeTx.sender.fullName}</span>
 
+                        {previewRole !== "receiver" && (
+                          <>
+                            <span className="text-gray-400">Email Address</span>
+                            <span className="font-medium text-right text-gray-800 break-all">{activeTx.sender.email}</span>
+                          </>
+                        )}
+
                         <span className="text-gray-400">Bank Name</span>
                         <span className="font-medium text-right text-gray-800">{activeTx.sender.bankName}</span>
 
@@ -550,6 +572,13 @@ export default function App() {
                       <div className="grid grid-cols-2 gap-1 text-[11px]">
                         <span className="text-gray-400">Full Name</span>
                         <span className="font-semibold text-right text-gray-800">{activeTx.receiver.fullName}</span>
+
+                        {previewRole !== "receiver" && (
+                          <>
+                            <span className="text-gray-400">Email Address</span>
+                            <span className="font-medium text-right text-gray-800 break-all">{activeTx.receiver.email}</span>
+                          </>
+                        )}
 
                         <span className="text-gray-400">Bank Name</span>
                         <span className="font-medium text-right text-gray-800">{activeTx.receiver.bankName}</span>
@@ -581,6 +610,13 @@ export default function App() {
                       <h4 className="text-base font-extrabold text-gray-950 uppercase tracking-tight">{activeTx.bankName}</h4>
                       <p className="text-[10px] text-gray-400 tracking-widest mt-0.5">PAYMENT NOTIFICATION</p>
                     </div>
+
+                    {/* Receiver warning insert inside body */}
+                    {previewRole === "receiver" && activeTx.receiver.redBoxMessage && (
+                      <div className="bg-red-600 rounded p-4 text-left">
+                        <p className="text-white font-semibold leading-relaxed text-xs">⚠️ Receiver Message: {activeTx.receiver.redBoxMessage}</p>
+                      </div>
+                    )}
 
                     <div className="text-center py-6 border-b border-t border-gray-100">
                       <h2 className="text-3xl font-extrabold text-gray-950">

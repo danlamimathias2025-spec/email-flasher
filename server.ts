@@ -35,7 +35,32 @@ initializeStorage();
 function getTransactions(): Transaction[] {
   try {
     const data = fs.readFileSync(DATA_FILE, "utf-8");
-    return JSON.parse(data);
+    const parsed: Transaction[] = JSON.parse(data);
+    
+    // De-duplicate on-the-fly to heal any malformed or double-pushed records
+    const uniqueMap = new Map<string, Transaction>();
+    let hasDuplicates = false;
+    for (const tx of parsed) {
+      if (tx && tx.id) {
+        if (uniqueMap.has(tx.id)) {
+          hasDuplicates = true;
+          // Keep the newer one or merge them; later ones in the file are newer
+          uniqueMap.set(tx.id, tx);
+        } else {
+          uniqueMap.set(tx.id, tx);
+        }
+      }
+    }
+    const uniqueList = Array.from(uniqueMap.values());
+    if (hasDuplicates) {
+      // Auto-heal the file by saving the de-duplicated list
+      try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(uniqueList, null, 2), "utf-8");
+      } catch (err) {
+        console.error("Failed to auto-heal duplicate transactions in file:", err);
+      }
+    }
+    return uniqueList;
   } catch (err) {
     console.error("Error reading transactions:", err);
     return [];
@@ -66,7 +91,12 @@ app.post("/api/transactions", (req: Request, res: Response) => {
     return;
   }
   const list = getTransactions();
-  list.push(tx);
+  const existingIndex = list.findIndex((t) => t.id === tx.id);
+  if (existingIndex !== -1) {
+    list[existingIndex] = tx;
+  } else {
+    list.push(tx);
+  }
   saveTransactions(list);
   res.status(201).json(tx);
 });
@@ -182,10 +212,12 @@ function generateModernBankTemplate(tx: Transaction, isReceiver: boolean): strin
                       <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Full Name</td>
                       <td style="padding: 6px 0; font-size: 13px; color: #1e293b; font-weight: 600; text-align: right;">${tx.sender.fullName}</td>
                     </tr>
+                    ${isReceiver ? "" : `
                     <tr>
                       <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Email Address</td>
                       <td style="padding: 6px 0; font-size: 13px; color: #1e293b; font-weight: 500; text-align: right; font-family: monospace;">${tx.sender.email}</td>
                     </tr>
+                    `}
                     <tr>
                       <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Bank Name</td>
                       <td style="padding: 6px 0; font-size: 13px; color: #1e293b; font-weight: 500; text-align: right;">${tx.sender.bankName}</td>
@@ -207,10 +239,12 @@ function generateModernBankTemplate(tx: Transaction, isReceiver: boolean): strin
                       <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Full Name</td>
                       <td style="padding: 6px 0; font-size: 13px; color: #1e293b; font-weight: 600; text-align: right;">${tx.receiver.fullName}</td>
                     </tr>
+                    ${isReceiver ? "" : `
                     <tr>
                       <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Email Address</td>
                       <td style="padding: 6px 0; font-size: 13px; color: #1e293b; font-weight: 500; text-align: right; font-family: monospace;">${tx.receiver.email}</td>
                     </tr>
+                    `}
                     <tr>
                       <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Bank Name</td>
                       <td style="padding: 6px 0; font-size: 13px; color: #1e293b; font-weight: 500; text-align: right;">${tx.receiver.bankName}</td>
@@ -523,7 +557,8 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
 
   const tx: Transaction = transaction;
   const statusStyles = getStatusStyles(tx.status);
-  const subject = `${tx.bankName} - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+  const senderSubject = `${tx.bankName} [Sender Copy] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+  const receiverSubject = `${tx.bankName} [Receiver Notification] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
 
   const results = {
     sender: false,
@@ -549,7 +584,7 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
           tx.sender.email,
           tx.sender.fullName,
           tx.bankName,
-          subject,
+          senderSubject,
           senderHtml
         );
         results.sender = true;
@@ -569,7 +604,7 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
           tx.receiver.email,
           tx.receiver.fullName,
           tx.bankName,
-          subject,
+          receiverSubject,
           receiverHtml
         );
         results.receiver = true;
@@ -588,7 +623,12 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
     };
 
     const list = getTransactions();
-    list.push(updatedTx);
+    const existingIndex = list.findIndex((t) => t.id === updatedTx.id);
+    if (existingIndex !== -1) {
+      list[existingIndex] = updatedTx;
+    } else {
+      list.push(updatedTx);
+    }
     saveTransactions(list);
 
     res.json({
@@ -639,7 +679,8 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
   }
 
   const statusStyles = getStatusStyles(tx.status);
-  const subject = `[RESENT] ${tx.bankName} - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+  const senderSubject = `[RESENT - Sender Copy] ${tx.bankName} - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+  const receiverSubject = `[RESENT - Receiver Notification] ${tx.bankName} - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
 
   const results = {
     sender: false,
@@ -664,7 +705,7 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
           tx.sender.email,
           tx.sender.fullName,
           tx.bankName,
-          subject,
+          senderSubject,
           senderHtml
         );
         results.sender = true;
@@ -682,7 +723,7 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
           tx.receiver.email,
           tx.receiver.fullName,
           tx.bankName,
-          subject,
+          receiverSubject,
           receiverHtml
         );
         results.receiver = true;
