@@ -476,6 +476,40 @@ async function sendResendEmail(
   return true;
 }
 
+// POST endpoint to generate previews for sender and receiver email templates
+app.post("/api/preview-email", (req: Request, res: Response) => {
+  const { transaction } = req.body;
+  if (!transaction) {
+    res.status(400).json({ error: "Missing transaction parameters for preview" });
+    return;
+  }
+
+  try {
+    const tx: Transaction = transaction;
+    const statusStyles = getStatusStyles(tx.status);
+    const senderSubject = `${tx.bankName} [Sender Copy] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+    const receiverSubject = `${tx.bankName} [Receiver Notification] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+
+    const senderHtml = tx.emailTemplate === "minimal_clean"
+      ? generateMinimalCleanTemplate(tx, false)
+      : generateModernBankTemplate(tx, false);
+
+    const receiverHtml = tx.emailTemplate === "minimal_clean"
+      ? generateMinimalCleanTemplate(tx, true)
+      : generateModernBankTemplate(tx, true);
+
+    res.json({
+      senderSubject,
+      senderHtml,
+      receiverSubject,
+      receiverHtml,
+    });
+  } catch (error: any) {
+    console.error("Error generating preview:", error);
+    res.status(500).json({ error: `Failed to generate email preview: ${error.message || error}` });
+  }
+});
+
 // POST endpoint to perform the actual transaction mailers
 app.post("/api/send-transfer", async (req: Request, res: Response) => {
   const { transaction, sendSender = true, sendReceiver = true } = req.body;
@@ -485,19 +519,10 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
   }
 
   // Key Resolution: 
-  // Sender email uses RESEND_API_KEY
-  const resendKey = process.env.RESEND_API_KEY;
-  // Receiver email uses BREVO_API_KEY
+  // Both sender and receiver emails will now use BREVO_API_KEY
   const brevoKey = process.env.BREVO_API_KEY;
 
-  if (sendSender && !resendKey) {
-    res.status(400).json({
-      error: "RESEND_API_KEY is not configured. Please add your Resend API key to the AI Studio Secrets panel or environment variable.",
-    });
-    return;
-  }
-
-  if (sendReceiver && !brevoKey) {
+  if ((sendSender || sendReceiver) && !brevoKey) {
     res.status(400).json({
       error: "BREVO_API_KEY is not configured. Please add your Brevo API key to the AI Studio Secrets panel or environment variable.",
     });
@@ -525,11 +550,11 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
       ? generateMinimalCleanTemplate(tx, true)
       : generateModernBankTemplate(tx, true);
 
-    // 2. Send email to Sender via Resend API
-    if (sendSender && resendKey) {
+    // 2. Send email to Sender via Brevo API
+    if (sendSender && brevoKey) {
       try {
-        await sendResendEmail(
-          resendKey,
+        await sendBrevoEmail(
+          brevoKey,
           tx.sender.email,
           tx.sender.fullName,
           tx.bankName,
@@ -596,33 +621,27 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
 
 // POST endpoint to manually resend emails for an existing transaction
 app.post("/api/resend-email", async (req: Request, res: Response) => {
-  const { transactionId, sendSender = true, sendReceiver = true } = req.body;
-  if (!transactionId) {
-    res.status(400).json({ error: "Missing transactionId parameter" });
-    return;
+  const { transactionId, transaction, sendSender = true, sendReceiver = true } = req.body;
+  
+  let tx = transaction;
+  if (!tx) {
+    if (!transactionId) {
+      res.status(400).json({ error: "Missing transaction parameters" });
+      return;
+    }
+    const list = getTransactions();
+    tx = list.find((t) => t.id === transactionId);
+    if (!tx) {
+      res.status(404).json({ error: "Transaction not found" });
+      return;
+    }
   }
 
-  const list = getTransactions();
-  const txIndex = list.findIndex((t) => t.id === transactionId);
-  if (txIndex === -1) {
-    res.status(404).json({ error: "Transaction not found" });
-    return;
-  }
-
-  const tx = list[txIndex];
-  const resendKey = process.env.RESEND_API_KEY;
   const brevoKey = process.env.BREVO_API_KEY;
 
-  if (sendSender && !resendKey) {
+  if ((sendSender || sendReceiver) && !brevoKey) {
     res.status(400).json({
-      error: "RESEND_API_KEY is not configured. Please add your Resend API key to the Secrets panel to send to Sender.",
-    });
-    return;
-  }
-
-  if (sendReceiver && !brevoKey) {
-    res.status(400).json({
-      error: "BREVO_API_KEY is not configured. Please add your Brevo API key to send to Receiver.",
+      error: "BREVO_API_KEY is not configured. Please add your Brevo API key to the Secrets panel to send emails.",
     });
     return;
   }
@@ -646,11 +665,11 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
       ? generateMinimalCleanTemplate(tx, true)
       : generateModernBankTemplate(tx, true);
 
-    // Send email to Sender via Resend API
-    if (sendSender && resendKey) {
+    // Send email to Sender via Brevo API
+    if (sendSender && brevoKey) {
       try {
-        await sendResendEmail(
-          resendKey,
+        await sendBrevoEmail(
+          brevoKey,
           tx.sender.email,
           tx.sender.fullName,
           tx.bankName,
@@ -687,8 +706,19 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
       emailsSent: results,
     };
 
-    list[txIndex] = updatedTx;
-    saveTransactions(list);
+    try {
+      const list = getTransactions();
+      const txIndex = list.findIndex((t) => t.id === updatedTx.id);
+      if (txIndex !== -1) {
+        list[txIndex] = updatedTx;
+        saveTransactions(list);
+      } else {
+        list.push(updatedTx);
+        saveTransactions(list);
+      }
+    } catch (e) {
+      console.warn("Could not save transaction status to disk:", e);
+    }
 
     res.json({
       success: results.sender || results.receiver,
@@ -725,4 +755,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
