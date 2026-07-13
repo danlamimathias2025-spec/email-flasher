@@ -459,17 +459,21 @@ export default function App() {
                     {resendStatus.text}
                   </div>
                 )}
-              </div>
-
-              {/* simulated email view frame */}
-              <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4 sm:p-8 max-w-lg mx-auto relative overflow-hidden">
+                      {/* simulated email view frame */}
+              <div 
+                className="border border-slate-300 shadow-lg rounded-xl p-6 sm:p-8 max-w-lg mx-auto relative overflow-hidden text-left"
+                style={{ 
+                  backgroundColor: '#f7f6f4', 
+                  backgroundImage: "url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%224%22 height=%224%22 viewBox=%220 0 4 4%22%3E%3Cpath d=%22M1 3h1v1H1V3zm2-2h1v1H3V1z%22 fill=%22%23e5e3df%22 fill-opacity=%220.4%22/%3E%3C/svg%3E')" 
+                }}
+              >
                 
                 {/* Simulated Email App bar */}
-                <div className="border-b border-slate-100 pb-3 mb-6 flex items-center justify-between text-xs text-slate-500 font-semibold">
+                <div className="border-b border-slate-300 pb-3 mb-6 flex items-center justify-between text-xs text-slate-500 font-semibold">
                   <div>
                     <div><span className="text-slate-400">From:</span> {activeTx.bankName} Alert Service</div>
                     <div className="mt-1">
-                      <span className="text-slate-400">To:</span> {previewRole === "sender" ? activeTx.sender.email : <span className="italic text-slate-300 font-normal">[Invisible for Privacy]</span>}
+                      <span className="text-slate-400">To:</span> {previewRole === "sender" ? activeTx.sender.email : <span className="italic text-slate-400 font-normal">[Invisible for Privacy]</span>}
                     </div>
                   </div>
                   <div className="text-right">
@@ -478,200 +482,147 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Receiver red box warning ONLY on receiver role */}
+                {/* 1. TOP HEADER TEXT */}
+                <div className="mb-5">
+                  <h3 className="text-lg font-bold text-black leading-tight">
+                    Payment Notification - {activeTx.id}
+                  </h3>
+                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                    <span>to me</span>
+                    <span className="text-[9px] text-gray-400">▼</span>
+                  </div>
+                </div>
+
+                {/* 2. LOGO BANNER */}
+                <div className="bg-[#0d2149] rounded-lg p-4 flex items-center justify-center gap-3 mb-6">
+                  <svg className="w-8 h-8 text-[#4f83f7] fill-current shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="12,2 2,9 22,9" />
+                    <rect x="3" y="10" width="18" height="2" />
+                    <rect x="5" y="13" width="2" height="7" />
+                    <rect x="9" y="13" width="2" height="7" />
+                    <rect x="13" y="13" width="2" height="7" />
+                    <rect x="17" y="13" width="2" height="7" />
+                    <rect x="2" y="21" width="20" height="2" />
+                  </svg>
+                  <span className="font-sans font-black text-xl tracking-wider text-[#4f83f7] uppercase">
+                    {activeTx.bankName.toUpperCase()}
+                  </span>
+                </div>
+
+                {/* 3. TRANSACTION AMOUNT */}
+                <div className="text-center mb-6">
+                  <div className="text-xs font-black text-black tracking-wider uppercase mb-1">
+                    TRANSACTION AMOUNT
+                  </div>
+                  <div className="text-3xl font-bold text-black">
+                    {activeTx.currency.symbol}{activeTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+
+                {/* 4. WARNING NOTICE BOX */}
                 {previewRole === "receiver" && activeTx.receiver.redBoxMessage && (
-                  <div className="bg-red-50 border-2 border-dashed border-red-200 p-4 rounded-xl mb-6 text-xs text-left">
-                    <h5 className="block text-[11px] font-bold text-red-700 mb-2 uppercase italic flex items-center gap-1">
-                      <AlertTriangle className="h-4.5 w-4.5 text-red-500 shrink-0" />
-                      ⚠️ Receiver's Alert Box Message
-                    </h5>
-                    <p className="font-semibold leading-relaxed text-red-900">{activeTx.receiver.redBoxMessage}</p>
+                  <div className="bg-[#fdf2f2] border-l-4 border-l-[#dc2626] rounded-lg p-3.5 mb-6 flex items-start gap-2 text-left">
+                    <svg className="w-5 h-5 text-yellow-500 fill-current shrink-0 mt-0.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 2L2 22h20L12 2zm-1 15h2v2h-2v-2zm0-8h2v6h-2V9z" />
+                    </svg>
+                    <span className="text-xs font-semibold leading-relaxed text-[#991b1b]">
+                      {activeTx.receiver.redBoxMessage}
+                    </span>
                   </div>
                 )}
 
-                {/* Rendered Template Body (Using elegant client-side simulation) */}
-                {activeTx.emailTemplate === "modern_bank" ? (
-                  // Modern Bank design
-                  <div className="space-y-6 text-left text-xs">
-                    {/* Header bar */}
-                    <div className="bg-slate-900 p-4 rounded-xl text-white flex justify-between items-center">
-                      <span className="font-bold tracking-tight text-sm">🏦 {activeTx.bankName}</span>
-                      <span className="text-[9px] font-mono text-slate-400">Official Receipt</span>
-                    </div>
-
-                    {/* Receiver warning insert inside body */}
-                    {previewRole === "receiver" && activeTx.receiver.redBoxMessage && (
-                      <div className="bg-rose-50 border-2 border-rose-500 rounded-xl p-4 font-sans text-left">
-                        <h4 className="text-rose-700 font-extrabold text-xs mb-1">⚠️ Notification for Receiver</h4>
-                        <p className="text-rose-800 font-semibold leading-relaxed text-xs">{activeTx.receiver.redBoxMessage}</p>
-                      </div>
-                    )}
-
-                    {/* Transaction Hero */}
-                    <div className="text-center py-4 bg-slate-50 rounded-xl border border-gray-100">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold text-center border ${
-                        activeTx.status === "successful"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : activeTx.status === "pending"
-                          ? "bg-amber-50 text-amber-700 border-amber-200 animate-pulse"
-                          : "bg-rose-50 text-rose-700 border-rose-200"
-                      }`}>
-                        ● {activeTx.status.toUpperCase()}
-                      </span>
-                      <h2 className="text-2xl font-black text-slate-900 mt-2">
-                        {activeTx.currency.symbol}{activeTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        <span className="text-sm font-semibold text-gray-500 ml-1">{activeTx.currency.code}</span>
-                      </h2>
-                      <p className="text-[10px] text-gray-400 font-medium mt-1">Transaction Ref: {activeTx.id}</p>
-                    </div>
-
-                    {/* Metadata */}
-                    <table className="w-full text-left divide-y divide-gray-100 text-[11px]">
-                      <tbody>
-                        <tr className="py-2.5">
-                          <td className="py-2 text-gray-500">Description</td>
-                          <td className="py-2 text-right font-semibold text-gray-800">{activeTx.description}</td>
-                        </tr>
-                        {activeTx.note && (
-                          <tr className="py-2.5">
-                            <td className="py-2 text-gray-500">Note</td>
-                            <td className="py-2 text-right font-medium text-gray-700 italic">"{activeTx.note}"</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-
-                    {/* Sender block */}
-                    <div className="border-t border-gray-100 pt-3">
-                      <h5 className="font-bold text-slate-900 uppercase tracking-wider text-[9px] mb-2">Sender Details</h5>
-                      <div className="grid grid-cols-2 gap-1 text-[11px]">
-                        <span className="text-gray-400">Full Name</span>
-                        <span className="font-semibold text-right text-gray-800">{activeTx.sender.fullName}</span>
-
-                        {previewRole !== "receiver" && (
-                          <>
-                            <span className="text-gray-400">Email Address</span>
-                            <span className="font-medium text-right text-gray-800 break-all">{activeTx.sender.email}</span>
-                          </>
-                        )}
-
-                        <span className="text-gray-400">Bank Name</span>
-                        <span className="font-medium text-right text-gray-800">{activeTx.sender.bankName}</span>
-
-                        <span className="text-gray-400">Account / IBAN</span>
-                        <span className="font-mono text-right text-gray-800">{activeTx.sender.accountNumber}</span>
-
-                        <span className="text-gray-400">SWIFT BIC</span>
-                        <span className="font-mono text-right text-gray-800">{activeTx.sender.swiftCode}</span>
-                      </div>
-                    </div>
-
-                    {/* Receiver block */}
-                    <div className="border-t border-gray-100 pt-3">
-                      <h5 className="font-bold text-slate-900 uppercase tracking-wider text-[9px] mb-2">Beneficiary Details</h5>
-                      <div className="grid grid-cols-2 gap-1 text-[11px]">
-                        <span className="text-gray-400">Full Name</span>
-                        <span className="font-semibold text-right text-gray-800">{activeTx.receiver.fullName}</span>
-
-                        {previewRole !== "receiver" && (
-                          <>
-                            <span className="text-gray-400">Email Address</span>
-                            <span className="font-medium text-right text-gray-800 break-all">{activeTx.receiver.email}</span>
-                          </>
-                        )}
-
-                        <span className="text-gray-400">Bank Name</span>
-                        <span className="font-medium text-right text-gray-800">{activeTx.receiver.bankName}</span>
-
-                        <span className="text-gray-400">Account / IBAN</span>
-                        <span className="font-mono text-right text-gray-800">{activeTx.receiver.accountNumber}</span>
-
-                        <span className="text-gray-400">SWIFT BIC</span>
-                        <span className="font-mono text-right text-gray-800">{activeTx.receiver.swiftCode}</span>
-                      </div>
-                    </div>
-
-                    {/* Support footer */}
-                    <div className="border-t border-gray-100 pt-4 text-center">
-                      <a 
-                        href={activeTx.supportLink.includes("@") && !activeTx.supportLink.startsWith("mailto:") ? `mailto:${activeTx.supportLink}` : activeTx.supportLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-block text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition"
-                      >
-                        Contact Support Assistance
-                      </a>
-                    </div>
+                {/* 5. TRANSACTION DETAILS SECTION */}
+                <div className="mb-6">
+                  <div className="text-left mb-3">
+                    <span className="text-sm font-extrabold text-[#0b2545] border-b-2 border-[#0b2545] pb-1 inline-block">
+                      Transaction Details
+                    </span>
                   </div>
-                ) : (
-                  // Minimal Clean design
-                  <div className="space-y-6 text-left text-xs text-gray-700">
-                    <div className="text-center">
-                      <h4 className="text-base font-extrabold text-gray-950 uppercase tracking-tight">{activeTx.bankName}</h4>
-                      <p className="text-[10px] text-gray-400 tracking-widest mt-0.5">PAYMENT NOTIFICATION</p>
-                    </div>
 
-                    {/* Receiver warning insert inside body */}
-                    {previewRole === "receiver" && activeTx.receiver.redBoxMessage && (
-                      <div className="bg-red-600 rounded p-4 text-left">
-                        <p className="text-white font-semibold leading-relaxed text-xs">⚠️ Receiver Message: {activeTx.receiver.redBoxMessage}</p>
+                  <div className="bg-white border border-gray-300 rounded-lg overflow-hidden p-4">
+                    <div className="divide-y divide-gray-100 text-xs">
+                      
+                      {/* Receiver Name */}
+                      <div className="py-2.5 flex justify-between items-center">
+                        <span className="font-bold text-[#0b2545]">Receiver Name</span>
+                        <span className="text-black text-right">{activeTx.receiver.fullName}</span>
                       </div>
-                    )}
 
-                    <div className="text-center py-6 border-b border-t border-gray-100">
-                      <h2 className="text-3xl font-extrabold text-gray-950">
-                        {activeTx.currency.symbol}{activeTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        <span className="text-base font-normal text-gray-400 ml-1">{activeTx.currency.code}</span>
-                      </h2>
-                      <div className="mt-2.5">
-                        <span className={`inline-block px-3 py-0.5 rounded text-[10px] font-bold border ${
-                          activeTx.status === "successful"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                            : activeTx.status === "pending"
-                            ? "bg-amber-50 text-amber-700 border-amber-100 animate-pulse"
-                            : "bg-rose-50 text-rose-700 border-rose-100"
-                        }`}>
+                      {/* Sender Name */}
+                      <div className="py-2.5 flex justify-between items-center">
+                        <span className="font-bold text-[#0b2545]">Sender Name</span>
+                        <span className="text-black text-right">{activeTx.sender.fullName}</span>
+                      </div>
+
+                      {/* Account Number */}
+                      <div className="py-2.5 flex justify-between items-center">
+                        <span className="font-bold text-[#0b2545]">Account Number</span>
+                        <span className="text-black font-mono text-right">{activeTx.receiver.accountNumber}</span>
+                      </div>
+
+                      {/* SWIFT Code */}
+                      <div className="py-2.5 flex justify-between items-center">
+                        <span className="font-bold text-[#0b2545]">SWIFT Code</span>
+                        <span className="text-black font-mono text-right">{activeTx.receiver.swiftCode}</span>
+                      </div>
+
+                      {/* Transaction ID */}
+                      <div className="py-2.5 flex justify-between items-center">
+                        <span className="font-bold text-[#0b2545]">Transaction ID</span>
+                        <span className="text-black font-mono text-right">{activeTx.id}</span>
+                      </div>
+
+                      {/* Date/Time */}
+                      <div className="py-2.5 flex justify-between items-center">
+                        <span className="font-bold text-[#0b2545]">Date/Time</span>
+                        <span className="text-black text-right">
+                          {new Date(activeTx.date).toLocaleDateString("en-US", {
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric"
+                          }) + " " + new Date(activeTx.date).toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true
+                          })}
+                        </span>
+                      </div>
+
+                      {/* Status */}
+                      <div className="py-2.5 flex justify-between items-center">
+                        <span className="font-bold text-[#0b2545]">Status</span>
+                        <span className="bg-[#16a34a] text-white text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
                           {activeTx.status.toUpperCase()}
                         </span>
                       </div>
-                    </div>
 
-                    <div className="space-y-4 pt-2">
-                      <div>
-                        <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Transfer Description</div>
-                        <div className="font-semibold text-gray-800">{activeTx.description}</div>
-                        {activeTx.note && <div className="text-gray-500 italic mt-0.5">Note: "{activeTx.note}"</div>}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 pt-1">
-                        <div>
-                          <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1.5">From Sender</div>
-                          <div className="font-bold text-gray-900 text-[11px]">{activeTx.sender.fullName}</div>
-                          <div className="text-gray-500 text-[10px] mt-0.5">{activeTx.sender.bankName}</div>
-                          <div className="font-mono text-gray-400 text-[10px]">{activeTx.sender.accountNumber}</div>
-                        </div>
-
-                        <div>
-                          <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1.5">To Beneficiary</div>
-                          <div className="font-bold text-gray-900 text-[11px]">{activeTx.receiver.fullName}</div>
-                          <div className="text-gray-500 text-[10px] mt-0.5">{activeTx.receiver.bankName}</div>
-                          <div className="font-mono text-gray-400 text-[10px]">{activeTx.receiver.accountNumber}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-6 text-center border-t border-gray-100">
-                      <a 
-                        href={activeTx.supportLink.includes("@") && !activeTx.supportLink.startsWith("mailto:") ? `mailto:${activeTx.supportLink}` : activeTx.supportLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-xs text-gray-800 font-bold underline hover:text-blue-600 transition"
-                      >
-                        Contact Secure Support
-                      </a>
                     </div>
                   </div>
-                )}
+                </div>
+
+                {/* 6. FOOTER TEXT */}
+                <div className="text-center pt-2">
+                  <div className="text-[11px] text-gray-600 font-medium flex items-center justify-center gap-1 mb-1.5">
+                    <svg className="w-3.5 h-3.5 text-yellow-700 fill-current shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                    </svg>
+                    <span>Secured by {activeTx.bankName.replace(/\s+/g, '').toUpperCase()} advanced encryption technology.</span>
+                  </div>
+                  <div className="text-[11px] text-gray-600 font-medium">
+                    For assistance, please{" "}
+                    <a 
+                      href={activeTx.supportLink.includes("@") && !activeTx.supportLink.startsWith("mailto:") ? `mailto:${activeTx.supportLink}` : activeTx.supportLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline font-bold"
+                    >
+                      contact support
+                    </a>
+                    .
+                  </div>
+                </div>
+
+              </div>
 
               </div>
 
