@@ -659,8 +659,8 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
   }
 
   const statusStyles = getStatusStyles(tx.status);
-  const senderSubject = `[RESENT - Sender Copy] ${tx.bankName} - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
-  const receiverSubject = `[RESENT - Receiver Notification] ${tx.bankName} - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+  const senderSubject = `${tx.bankName} [Sender Copy] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+  const receiverSubject = `${tx.bankName} [Receiver Notification] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
 
   const results = {
     sender: false,
