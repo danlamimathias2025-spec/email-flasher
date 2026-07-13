@@ -46,6 +46,9 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   const [sendNowResult, setSendNowResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [shouldSendSender, setShouldSendSender] = useState(false);
   const [shouldSendReceiver, setShouldSendReceiver] = useState(false);
+  const [brevoSenderEmail, setBrevoSenderEmail] = useState(() => {
+    return localStorage.getItem("brevo_sender_email") || "danlamimathias2025@gmail.com";
+  });
   
   // Validation Error State
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -432,7 +435,8 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
         body: JSON.stringify({
           transaction: transactionPayload,
           sendSender: shouldSendSender,
-          sendReceiver: shouldSendReceiver
+          sendReceiver: shouldSendReceiver,
+          brevoSenderEmail
         }),
       });
 
@@ -520,7 +524,8 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
           transactionId: createdTx.id,
           transaction: updatedTxPayload, // Stateless payload for robust operations
           sendSender,
-          sendReceiver
+          sendReceiver,
+          brevoSenderEmail
         })
       });
 
@@ -650,10 +655,30 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
 
           <div className="space-y-3.5 pt-6 border-t border-slate-150">
             {/* EMAIL DISPATCH CONTROLS */}
-            <div className="text-left">
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 bg-white inline-block px-1">
+            <div className="text-left space-y-3">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white inline-block px-1">
                 📧 Manual Email Dispatch Controls
               </h4>
+
+              {/* Verified Brevo Sender Email info & input on success screen too */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-left">
+                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                  Verified Brevo Sender Email
+                </label>
+                <input
+                  type="email"
+                  value={brevoSenderEmail}
+                  onChange={(e) => {
+                    setBrevoSenderEmail(e.target.value);
+                    localStorage.setItem("brevo_sender_email", e.target.value);
+                  }}
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-800 bg-white outline-none"
+                  placeholder="sender@verifieddomain.com"
+                />
+                <p className="text-[9px] text-slate-400 leading-normal font-medium">
+                  Verify this is a registered sender in your Brevo account dashboard.
+                </p>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5">
                 {/* Dispatch to Sender */}
                 <button
@@ -1588,12 +1613,36 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
 
             {/* Email Dispatch Control Card */}
             <div className="border border-slate-250 rounded-xl p-4 bg-slate-50/50 space-y-3.5 text-left border-dashed">
-              <div className="flex items-center gap-2 text-slate-800">
-                <Mail className="h-4.5 w-4.5 text-blue-600 shrink-0" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-700">
-                  Instant Email Dispatch Settings
-                </span>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-slate-800">
+                  <Mail className="h-4.5 w-4.5 text-blue-600 shrink-0" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-700">
+                    Instant Email Dispatch Settings
+                  </span>
+                </div>
               </div>
+              
+              {/* Custom Brevo Sender Email input */}
+              <div className="space-y-1.5 bg-white p-3 border border-slate-200 rounded-xl">
+                <label className="block text-[9px] font-bold text-slate-700 uppercase tracking-wider">
+                  Verified Brevo Sender Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. sender@verifieddomain.com"
+                  value={brevoSenderEmail}
+                  onChange={(e) => {
+                    setBrevoSenderEmail(e.target.value);
+                    localStorage.setItem("brevo_sender_email", e.target.value);
+                  }}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none"
+                />
+                <p className="text-[9px] text-slate-400 font-medium leading-normal">
+                  ⚠️ <strong>Important:</strong> Brevo requires this email to be a <strong>verified sender</strong> in your Brevo account dashboard. If you use a non-verified email, Brevo will refuse to dispatch.
+                </p>
+              </div>
+
               <p className="text-[10px] text-slate-500 font-medium leading-normal">
                 Choose which parties should receive instant email alerts automatically upon saving the transaction. Uncheck both to save without sending automatically.
               </p>

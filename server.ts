@@ -372,13 +372,14 @@ async function sendBrevoEmail(
   toName: string,
   bankName: string,
   subject: string,
-  htmlContent: string
+  htmlContent: string,
+  senderEmail?: string
 ): Promise<boolean> {
   const url = "https://api.brevo.com/v3/smtp/email";
   const body = {
     sender: {
       name: bankName,
-      email: "transactions@brevo-transfer.com",
+      email: senderEmail || process.env.BREVO_SENDER_EMAIL || "transactions@brevo-transfer.com",
     },
     to: [
       {
@@ -512,7 +513,7 @@ app.post("/api/preview-email", (req: Request, res: Response) => {
 
 // POST endpoint to perform the actual transaction mailers
 app.post("/api/send-transfer", async (req: Request, res: Response) => {
-  const { transaction, sendSender = true, sendReceiver = true } = req.body;
+  const { transaction, sendSender = true, sendReceiver = true, brevoSenderEmail } = req.body;
   if (!transaction) {
     res.status(400).json({ error: "Missing transaction parameters" });
     return;
@@ -559,7 +560,8 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
           tx.sender.fullName,
           tx.bankName,
           senderSubject,
-          senderHtml
+          senderHtml,
+          brevoSenderEmail
         );
         results.sender = true;
       } catch (err: any) {
@@ -579,7 +581,8 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
           tx.receiver.fullName,
           tx.bankName,
           receiverSubject,
-          receiverHtml
+          receiverHtml,
+          brevoSenderEmail
         );
         results.receiver = true;
       } catch (err: any) {
@@ -605,6 +608,15 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
     }
     saveTransactions(list);
 
+    if (results.error) {
+      res.status(400).json({
+        error: results.error,
+        results: results,
+        transaction: updatedTx,
+      });
+      return;
+    }
+
     res.json({
       success: results.sender || results.receiver,
       results: results,
@@ -621,7 +633,7 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
 
 // POST endpoint to manually resend emails for an existing transaction
 app.post("/api/resend-email", async (req: Request, res: Response) => {
-  const { transactionId, transaction, sendSender = true, sendReceiver = true } = req.body;
+  const { transactionId, transaction, sendSender = true, sendReceiver = true, brevoSenderEmail } = req.body;
   
   let tx = transaction;
   if (!tx) {
@@ -674,7 +686,8 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
           tx.sender.fullName,
           tx.bankName,
           senderSubject,
-          senderHtml
+          senderHtml,
+          brevoSenderEmail
         );
         results.sender = true;
       } catch (err: any) {
@@ -692,7 +705,8 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
           tx.receiver.fullName,
           tx.bankName,
           receiverSubject,
-          receiverHtml
+          receiverHtml,
+          brevoSenderEmail
         );
         results.receiver = true;
       } catch (err: any) {
@@ -718,6 +732,15 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
       }
     } catch (e) {
       console.warn("Could not save transaction status to disk:", e);
+    }
+
+    if (results.error) {
+      res.status(400).json({
+        error: results.error,
+        results: results,
+        transaction: updatedTx,
+      });
+      return;
     }
 
     res.json({
