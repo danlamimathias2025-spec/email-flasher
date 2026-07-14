@@ -6,8 +6,12 @@
 import express, { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
+import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { Transaction, TransactionStatus } from "./src/types";
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 const PORT = 3000;
@@ -15,17 +19,23 @@ const PORT = 3000;
 // Enable JSON bodies with higher limits for base64 logos
 app.use(express.json({ limit: "50mb" }));
 
-// File storage configuration for transaction history
-const DATA_DIR = path.join(process.cwd(), "data");
+// File storage configuration for transaction history - Vercel read-only safe
+const DATA_DIR = process.env.VERCEL
+  ? "/tmp"
+  : path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "transactions.json");
 
 // Ensure storage file exists
 function initializeStorage() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    if (!fs.existsSync(DATA_FILE)) {
+      fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
+    }
+  } catch (error) {
+    console.error("Failed to initialize storage on disk (non-fatal):", error);
   }
 }
 
@@ -34,6 +44,9 @@ initializeStorage();
 // Read transactions from file
 function getTransactions(): Transaction[] {
   try {
+    if (!fs.existsSync(DATA_FILE)) {
+      return [];
+    }
     const data = fs.readFileSync(DATA_FILE, "utf-8");
     const parsed: Transaction[] = JSON.parse(data);
     
