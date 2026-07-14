@@ -46,8 +46,8 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   const [sendNowResult, setSendNowResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [shouldSendSender, setShouldSendSender] = useState(false);
   const [shouldSendReceiver, setShouldSendReceiver] = useState(false);
-  const [brevoSenderEmail, setBrevoSenderEmail] = useState(() => {
-    return localStorage.getItem("brevo_sender_email") || "danlamimathias2025@gmail.com";
+  const [mailjetSenderEmail, setMailjetSenderEmail] = useState(() => {
+    return localStorage.getItem("mailjet_sender_email") || localStorage.getItem("brevo_sender_email") || "danlamimathias2025@gmail.com";
   });
   
   // Validation Error State
@@ -436,7 +436,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
           transaction: transactionPayload,
           sendSender: shouldSendSender,
           sendReceiver: shouldSendReceiver,
-          brevoSenderEmail
+          mailjetSenderEmail
         }),
       });
 
@@ -517,7 +517,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
         }
       };
 
-      const result = await safeFetchJson<{ success: boolean; results?: { sender: boolean; receiver: boolean }; transaction?: Transaction }>("/api/resend-email", {
+       const result = await safeFetchJson<{ success: boolean; results?: { sender: boolean; receiver: boolean }; transaction?: Transaction }>("/api/resend-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -525,7 +525,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
           transaction: updatedTxPayload, // Stateless payload for robust operations
           sendSender,
           sendReceiver,
-          brevoSenderEmail
+          mailjetSenderEmail
         })
       });
 
@@ -549,7 +549,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
       setCreatedTx(returnedTx);
     } catch (err: any) {
       console.error(err);
-      const errMsg = err.message || "Failed to dispatch emails. Please check your Brevo API configuration.";
+      const errMsg = err.message || "Failed to dispatch emails. Please check your Mailjet API configuration.";
       setSendNowResult({
         type: "error",
         text: errMsg
@@ -660,23 +660,23 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
                 📧 Manual Email Dispatch Controls
               </h4>
 
-              {/* Verified Brevo Sender Email info & input on success screen too */}
+              {/* Verified Mailjet Sender Email info & input on success screen too */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-left">
                 <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                  Verified Brevo Sender Email
+                  Verified Mailjet Sender Email
                 </label>
                 <input
                   type="email"
-                  value={brevoSenderEmail}
+                  value={mailjetSenderEmail}
                   onChange={(e) => {
-                    setBrevoSenderEmail(e.target.value);
-                    localStorage.setItem("brevo_sender_email", e.target.value);
+                    setMailjetSenderEmail(e.target.value);
+                    localStorage.setItem("mailjet_sender_email", e.target.value);
                   }}
                   className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-800 bg-white outline-none"
                   placeholder="sender@verifieddomain.com"
                 />
                 <p className="text-[9px] text-slate-400 leading-normal font-medium">
-                  Verify this is a registered sender in your Brevo account dashboard.
+                  Verify this is a registered sender in your Mailjet account dashboard.
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5">
@@ -1622,24 +1622,24 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
                 </div>
               </div>
               
-              {/* Custom Brevo Sender Email input */}
+              {/* Custom Mailjet Sender Email input */}
               <div className="space-y-1.5 bg-white p-3 border border-slate-200 rounded-xl">
                 <label className="block text-[9px] font-bold text-slate-700 uppercase tracking-wider">
-                  Verified Brevo Sender Email
+                  Verified Mailjet Sender Email
                 </label>
                 <input
                   type="email"
                   required
                   placeholder="e.g. sender@verifieddomain.com"
-                  value={brevoSenderEmail}
+                  value={mailjetSenderEmail}
                   onChange={(e) => {
-                    setBrevoSenderEmail(e.target.value);
-                    localStorage.setItem("brevo_sender_email", e.target.value);
+                    setMailjetSenderEmail(e.target.value);
+                    localStorage.setItem("mailjet_sender_email", e.target.value);
                   }}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none"
                 />
                 <p className="text-[9px] text-slate-400 font-medium leading-normal">
-                  ⚠️ <strong>Important:</strong> Brevo requires this email to be a <strong>verified sender</strong> in your Brevo account dashboard. If you use a non-verified email, Brevo will refuse to dispatch.
+                  ⚠️ <strong>Important:</strong> Mailjet requires this email to be a <strong>verified sender</strong> in your Mailjet account dashboard. If you use a non-verified email, Mailjet will refuse to dispatch.
                 </p>
               </div>
 

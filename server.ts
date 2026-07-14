@@ -147,9 +147,7 @@ function generateModernPaperReceipt(tx: Transaction, isReceiver: boolean): strin
       <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px; background-color: #fce8e6; border-left: 4px solid #dc2626; border-radius: 8px; width: 100%; border-collapse: separate;">
         <tr>
           <td style="padding: 14px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #991b1b; font-weight: 600; line-height: 1.5; text-align: left; vertical-align: middle;">
-            <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: #eab308; vertical-align: middle; margin-right: 8px; display: inline-block;" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L2 22h20L12 2zm-1 15h2v2h-2v-2zm0-8h2v6h-2V9z" />
-            </svg>
+            <span style="font-size: 16px; margin-right: 8px; vertical-align: middle;">⚠️</span>
             <span style="vertical-align: middle;">${tx.receiver.redBoxMessage}</span>
           </td>
         </tr>
@@ -165,7 +163,7 @@ function generateModernPaperReceipt(tx: Transaction, isReceiver: boolean): strin
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>${tx.bankName} Transaction Notification</title>
     </head>
-    <body style="margin: 0; padding: 0; background-color: #f7f6f4; background-image: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%224%22 height=%224%22 viewBox=%220 0 4 4%22%3E%3Cpath d=%22M1 3h1v1H1V3zm2-2h1v1H3V1z%22 fill=%22%23e5e3df%22 fill-opacity=%220.4%22/%3E%3C/svg%3E'); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: none;">
+    <body style="margin: 0; padding: 0; background-color: #f4f6f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: none;">
       <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: transparent; padding: 32px 12px;">
         <tr>
           <td align="center" style="vertical-align: top;">
@@ -178,7 +176,7 @@ function generateModernPaperReceipt(tx: Transaction, isReceiver: boolean): strin
                     Payment Notification - ${tx.id}
                   </div>
                   <div style="font-size: 13px; color: #555555; margin-top: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    to me <span style="font-size: 10px; margin-left: 2px; color: #888888; vertical-align: middle;">▼</span>
+                    Official Receipt
                   </div>
                 </td>
               </tr>
@@ -191,16 +189,8 @@ function generateModernPaperReceipt(tx: Transaction, isReceiver: boolean): strin
                       <td align="center" style="padding: 16px 20px; vertical-align: middle; text-align: center;">
                         <table border="0" cellpadding="0" cellspacing="0" style="display: inline-table; margin: 0 auto;">
                           <tr>
-                            <td style="vertical-align: middle; padding-right: 12px;">
-                              <svg viewBox="0 0 24 24" style="width: 32px; height: 32px; fill: #4f83f7; display: block;" xmlns="http://www.w3.org/2000/svg">
-                                <polygon points="12,2 2,9 22,9" />
-                                <rect x="3" y="10" width="18" height="2" />
-                                <rect x="5" y="13" width="2" height="7" />
-                                <rect x="9" y="13" width="2" height="7" />
-                                <rect x="13" y="13" width="2" height="7" />
-                                <rect x="17" y="13" width="2" height="7" />
-                                <rect x="2" y="21" width="20" height="2" />
-                              </svg>
+                            <td style="vertical-align: middle; padding-right: 12px; font-size: 32px; line-height: 1;">
+                              🏦
                             </td>
                             <td style="vertical-align: middle; font-family: 'Arial Black', -apple-system, sans-serif; font-size: 26px; font-weight: 900; color: #4f83f7; letter-spacing: 2px; text-transform: uppercase;">
                               ${displayBankName}
@@ -334,9 +324,7 @@ function generateModernPaperReceipt(tx: Transaction, isReceiver: boolean): strin
                 <td style="padding-top: 4px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                   <!-- Secured padlock line -->
                   <div style="font-size: 11.5px; color: #555555; font-weight: 500; display: inline-block; text-align: center; margin-bottom: 6px;">
-                    <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: #854d0e; vertical-align: middle; margin-right: 4px; display: inline-block;" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
-                    </svg>
+                    <span style="font-size: 13px; margin-right: 4px; vertical-align: middle;">🔒</span>
                     <span style="vertical-align: middle;">Secured by ${secureBankName} advanced encryption technology.</span>
                   </div>
                   <!-- Support Assistance Line -->
@@ -365,9 +353,10 @@ function generateMinimalCleanTemplate(tx: Transaction, isReceiver: boolean): str
   return generateModernPaperReceipt(tx, isReceiver);
 }
 
-// Brevo API email dispatcher
-async function sendBrevoEmail(
-  apiKey: string,
+// Mailjet API email dispatcher
+async function sendMailjetEmail(
+  publicKey: string,
+  privateKey: string,
   toEmail: string,
   toName: string,
   bankName: string,
@@ -375,35 +364,36 @@ async function sendBrevoEmail(
   htmlContent: string,
   senderEmail?: string
 ): Promise<boolean> {
-  const url = "https://api.brevo.com/v3/smtp/email";
+  const url = "https://api.mailjet.com/v3/send";
+  const fromEmail = senderEmail || process.env.MAILJET_SENDER_EMAIL || "transactions@mailjet-transfer.com";
+  
   const body = {
-    sender: {
-      name: bankName,
-      email: senderEmail || process.env.BREVO_SENDER_EMAIL || "transactions@brevo-transfer.com",
-    },
-    to: [
+    FromEmail: fromEmail,
+    FromName: bankName,
+    Recipients: [
       {
-        email: toEmail,
-        name: toName,
+        Email: toEmail,
+        Name: toName,
       },
     ],
-    subject: subject,
-    htmlContent: htmlContent,
+    Subject: subject,
+    "Html-part": htmlContent,
   };
+
+  const auth = Buffer.from(`${publicKey}:${privateKey}`).toString("base64");
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
-      "accept": "application/json",
-      "api-key": apiKey,
-      "content-type": "application/json",
+      "Authorization": `Basic ${auth}`,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Brevo API Error (${response.status}): ${errorText}`);
+    throw new Error(`Mailjet API Error (${response.status}): ${errorText}`);
   }
 
   return true;
@@ -513,19 +503,20 @@ app.post("/api/preview-email", (req: Request, res: Response) => {
 
 // POST endpoint to perform the actual transaction mailers
 app.post("/api/send-transfer", async (req: Request, res: Response) => {
-  const { transaction, sendSender = true, sendReceiver = true, brevoSenderEmail } = req.body;
+  const { transaction, sendSender = true, sendReceiver = true, mailjetSenderEmail, brevoSenderEmail } = req.body;
   if (!transaction) {
     res.status(400).json({ error: "Missing transaction parameters" });
     return;
   }
 
   // Key Resolution: 
-  // Both sender and receiver emails will now use BREVO_API_KEY
-  const brevoKey = process.env.BREVO_API_KEY;
+  // Both sender and receiver emails will now use MJ_APIKEY_PUBLIC and MJ_APIKEY_PRIVATE
+  const mjPublic = process.env.MJ_APIKEY_PUBLIC;
+  const mjPrivate = process.env.MJ_APIKEY_PRIVATE;
 
-  if ((sendSender || sendReceiver) && !brevoKey) {
+  if ((sendSender || sendReceiver) && (!mjPublic || !mjPrivate)) {
     res.status(400).json({
-      error: "BREVO_API_KEY is not configured. Please add your Brevo API key to the AI Studio Secrets panel or environment variable.",
+      error: "MJ_APIKEY_PUBLIC and/or MJ_APIKEY_PRIVATE are not configured. Please add your Mailjet API keys to the AI Studio Secrets panel or environment variables.",
     });
     return;
   }
@@ -541,6 +532,8 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
     error: "",
   };
 
+  const senderEmailToUse = mailjetSenderEmail || brevoSenderEmail;
+
   try {
     // 1. Generate HTML contents
     const senderHtml = tx.emailTemplate === "minimal_clean"
@@ -551,17 +544,18 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
       ? generateMinimalCleanTemplate(tx, true)
       : generateModernBankTemplate(tx, true);
 
-    // 2. Send email to Sender via Brevo API
-    if (sendSender && brevoKey) {
+    // 2. Send email to Sender via Mailjet API
+    if (sendSender && mjPublic && mjPrivate) {
       try {
-        await sendBrevoEmail(
-          brevoKey,
+        await sendMailjetEmail(
+          mjPublic,
+          mjPrivate,
           tx.sender.email,
           tx.sender.fullName,
           tx.bankName,
           senderSubject,
           senderHtml,
-          brevoSenderEmail
+          senderEmailToUse
         );
         results.sender = true;
       } catch (err: any) {
@@ -572,17 +566,18 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
       results.sender = false;
     }
 
-    // 3. Send email to Receiver via Brevo API
-    if (sendReceiver && brevoKey) {
+    // 3. Send email to Receiver via Mailjet API
+    if (sendReceiver && mjPublic && mjPrivate) {
       try {
-        await sendBrevoEmail(
-          brevoKey,
+        await sendMailjetEmail(
+          mjPublic,
+          mjPrivate,
           tx.receiver.email,
           tx.receiver.fullName,
           tx.bankName,
           receiverSubject,
           receiverHtml,
-          brevoSenderEmail
+          senderEmailToUse
         );
         results.receiver = true;
       } catch (err: any) {
@@ -633,7 +628,7 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
 
 // POST endpoint to manually resend emails for an existing transaction
 app.post("/api/resend-email", async (req: Request, res: Response) => {
-  const { transactionId, transaction, sendSender = true, sendReceiver = true, brevoSenderEmail } = req.body;
+  const { transactionId, transaction, sendSender = true, sendReceiver = true, mailjetSenderEmail, brevoSenderEmail } = req.body;
   
   let tx = transaction;
   if (!tx) {
@@ -649,11 +644,12 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
     }
   }
 
-  const brevoKey = process.env.BREVO_API_KEY;
+  const mjPublic = process.env.MJ_APIKEY_PUBLIC;
+  const mjPrivate = process.env.MJ_APIKEY_PRIVATE;
 
-  if ((sendSender || sendReceiver) && !brevoKey) {
+  if ((sendSender || sendReceiver) && (!mjPublic || !mjPrivate)) {
     res.status(400).json({
-      error: "BREVO_API_KEY is not configured. Please add your Brevo API key to the Secrets panel to send emails.",
+      error: "MJ_APIKEY_PUBLIC and/or MJ_APIKEY_PRIVATE are not configured. Please add your Mailjet API keys to the Secrets panel to send emails.",
     });
     return;
   }
@@ -668,6 +664,8 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
     error: "",
   };
 
+  const senderEmailToUse = mailjetSenderEmail || brevoSenderEmail;
+
   try {
     const senderHtml = tx.emailTemplate === "minimal_clean"
       ? generateMinimalCleanTemplate(tx, false)
@@ -677,17 +675,18 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
       ? generateMinimalCleanTemplate(tx, true)
       : generateModernBankTemplate(tx, true);
 
-    // Send email to Sender via Brevo API
-    if (sendSender && brevoKey) {
+    // Send email to Sender via Mailjet API
+    if (sendSender && mjPublic && mjPrivate) {
       try {
-        await sendBrevoEmail(
-          brevoKey,
+        await sendMailjetEmail(
+          mjPublic,
+          mjPrivate,
           tx.sender.email,
           tx.sender.fullName,
           tx.bankName,
           senderSubject,
           senderHtml,
-          brevoSenderEmail
+          senderEmailToUse
         );
         results.sender = true;
       } catch (err: any) {
@@ -696,17 +695,18 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
       }
     }
 
-    // Send email to Receiver via Brevo API
-    if (sendReceiver && brevoKey) {
+    // Send email to Receiver via Mailjet API
+    if (sendReceiver && mjPublic && mjPrivate) {
       try {
-        await sendBrevoEmail(
-          brevoKey,
+        await sendMailjetEmail(
+          mjPublic,
+          mjPrivate,
           tx.receiver.email,
           tx.receiver.fullName,
           tx.bankName,
           receiverSubject,
           receiverHtml,
-          brevoSenderEmail
+          senderEmailToUse
         );
         results.receiver = true;
       } catch (err: any) {
