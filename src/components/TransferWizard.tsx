@@ -47,7 +47,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   const [shouldSendSender, setShouldSendSender] = useState(false);
   const [shouldSendReceiver, setShouldSendReceiver] = useState(false);
   const [gmailSenderEmail, setGmailSenderEmail] = useState(() => {
-    return localStorage.getItem("gmail_sender_email") || localStorage.getItem("mailjet_sender_email") || localStorage.getItem("brevo_sender_email") || "danlamimathias2025@gmail.com";
+    return localStorage.getItem("gmail_sender_email") || localStorage.getItem("mailjet_sender_email") || localStorage.getItem("brevo_sender_email") || "internationalbank2026@gmail.com";
   });
   
   // Validation Error State
@@ -56,7 +56,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   // Step 1: Transaction Setup
   const [bankName, setBankName] = useState("Union Trust Bank");
   const [logoUrl, setLogoUrl] = useState<string>("");
-  const [supportLink, setSupportLink] = useState("danlamimathias2025@gmail.com");
+  const [supportLink, setSupportLink] = useState("internationalbank2026@gmail.com");
   const [amount, setAmount] = useState<number>(12500);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(ALL_CURRENCIES[0]); // default USD
   const [transactionDate, setTransactionDate] = useState<string>(

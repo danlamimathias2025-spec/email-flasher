@@ -25,6 +25,7 @@ import {
   ExternalLink,
   RefreshCw,
   Check,
+  Copy,
   CreditCard
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
@@ -35,7 +36,7 @@ import { safeFetchJson, getLocalTransactions, clearLocalTransactions } from "./u
 
 export default function App() {
   const [isLocalMode, setIsLocalMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<"home" | "history">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "history" | "email">("home");
 
   // App Access Gate State
   const [accessCode, setAccessCode] = useState("");
@@ -50,6 +51,22 @@ export default function App() {
     return localStorage.getItem("app_access_granted") === "true";
   });
   const [accessError, setAccessError] = useState("");
+  const [showEmailPrompt, setShowEmailPrompt] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedPass, setCopiedPass] = useState(false);
+
+  const copyToClipboard = (text: string, isEmail: boolean) => {
+    navigator.clipboard.writeText(text);
+    if (isEmail) {
+      setCopiedEmail(true);
+      setTimeout(() => setCopiedEmail(false), 2000);
+      toast.success("Email address copied!");
+    } else {
+      setCopiedPass(true);
+      setTimeout(() => setCopiedPass(false), 2000);
+      toast.success("App Password copied!");
+    }
+  };
 
   // Transaction ledger state
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -74,11 +91,16 @@ export default function App() {
       return;
     }
     
+    setShowEmailPrompt(true);
+    setAccessError("");
+  };
+
+  const handleCompleteActivation = () => {
     localStorage.setItem("user_email", userEmail.trim());
     localStorage.setItem("app_access_granted", "true");
     setCurrentUserEmail(userEmail.trim());
     setIsAuthorized(true);
-    setAccessError("");
+    setShowEmailPrompt(false);
     toast.success(`Access granted! Session initialized for ${userEmail.trim()}`);
   };
 
@@ -191,6 +213,106 @@ export default function App() {
 
   // ACCESS GATE VIEW
   if (!isAuthorized) {
+    if (showEmailPrompt) {
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-12 font-sans animate-fade-in" id="device-email-setup-gate">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800/80 rounded-2xl shadow-2xl overflow-hidden relative">
+            
+            {/* Top subtle highlight band */}
+            <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-blue-500 to-indigo-500" />
+
+            <div className="p-8 space-y-6">
+              {/* Header / Brand */}
+              <div className="text-center space-y-2">
+                <div className="mx-auto w-12 h-12 bg-blue-950/40 text-blue-400 border border-blue-800/30 rounded-xl flex items-center justify-center shadow-lg mb-3">
+                  <Mail className="h-5 w-5 text-blue-400 animate-pulse" />
+                </div>
+                <h2 className="text-xl font-black tracking-tight text-white uppercase">DEVICE MAIL SETUP</h2>
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">System Email Integration Required</p>
+              </div>
+
+              <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl text-xs space-y-2 leading-relaxed text-left">
+                <p className="font-bold uppercase text-[9px] tracking-wider text-amber-400 flex items-center gap-1">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Mandatory Security Sync
+                </p>
+                <p>
+                  To use this secure terminal and enable automatic transfer notification dispatches, you <strong className="text-white">MUST add and configure the following system Google SMTP account</strong> on your device mail client.
+                </p>
+              </div>
+
+              {/* Email Credentials Card */}
+              <div className="space-y-3.5 bg-slate-950 border border-slate-800 p-4 rounded-xl text-left">
+                {/* Email Field */}
+                <div className="space-y-1">
+                  <span className="block text-[8px] font-black text-slate-500 uppercase tracking-wider">Email Address</span>
+                  <div className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg">
+                    <code className="text-xs font-mono text-emerald-400 select-all truncate">internationalbank2026@gmail.com</code>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard("internationalbank2026@gmail.com", true)}
+                      className="text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                      title="Copy email address"
+                    >
+                      {copiedEmail ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Password Field */}
+                <div className="space-y-1">
+                  <span className="block text-[8px] font-black text-slate-500 uppercase tracking-wider">App Password</span>
+                  <div className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg">
+                    <code className="text-xs font-mono text-blue-400 select-all font-bold">Bank2026@</code>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard("Bank2026@", false)}
+                      className="text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                      title="Copy App password"
+                    >
+                      {copiedPass ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[10px] text-slate-400 leading-normal space-y-1.5 font-medium text-left">
+                <p>• Open your device Settings &rarr; Accounts &rarr; Add Google Account.</p>
+                <p>• Enter the email and password credentials shown above.</p>
+                <p>• Keep the account logged in to ensure flawless SMTP transmission alerts.</p>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCompleteActivation}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-blue-950/50 cursor-pointer flex items-center justify-center gap-2 animate-pulse"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  I have added this account - Continue
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowEmailPrompt(false)}
+                  className="w-full py-2.5 bg-transparent hover:bg-slate-800/40 text-slate-400 hover:text-white font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all border border-slate-800 cursor-pointer"
+                >
+                  Go Back
+                </button>
+              </div>
+
+            </div>
+          </div>
+          
+          {/* Footer */}
+          <p className="text-[9px] text-slate-600 mt-6 uppercase tracking-widest font-bold">
+            © 2026 GLOBAL SECURE NETWORKS GROUP
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center px-4 py-12 font-sans" id="access-gate">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800/80 rounded-2xl shadow-2xl overflow-hidden relative">
@@ -366,7 +488,7 @@ export default function App() {
       <main className="flex-1 max-w-xl w-full mx-auto px-4 py-8 flex flex-col justify-center">
         {activeTab === "home" ? (
           <TransferWizard onTransferSuccess={handleTransferSuccess} isLocalMode={isLocalMode} />
-        ) : (
+        ) : activeTab === "history" ? (
           <div className="space-y-4 flex-1 flex flex-col justify-start">
             <div className="text-left mb-1 px-1">
               <h2 className="text-lg font-black tracking-tight text-slate-900 uppercase">Transaction Audit History</h2>
@@ -388,6 +510,69 @@ export default function App() {
               />
             )}
           </div>
+        ) : (
+          /* Device SMTP Configuration View */
+          <div className="space-y-6 flex-1 flex flex-col justify-start max-w-md mx-auto w-full animate-fade-in">
+            <div className="text-left mb-1 px-1">
+              <h2 className="text-lg font-black tracking-tight text-slate-900 uppercase">Device SMTP Configuration</h2>
+              <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black mt-0.5">Device Mail Client Access Information</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+              <div className="p-4 bg-blue-50 border border-blue-150 rounded-xl space-y-1.5 text-left">
+                <h3 className="font-black text-xs text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Mail className="h-4 w-4 text-blue-500" />
+                  SMTP Mail Integration
+                </h3>
+                <p className="text-[11px] text-slate-600 leading-relaxed font-semibold">
+                  This system utilizes secure Gmail SMTP. To ensure flawless automatic receiver-side alert deliveries, you must have this account configured on your active device mail client.
+                </p>
+              </div>
+
+              {/* Email Credentials UI */}
+              <div className="space-y-4">
+                <div className="space-y-1 text-left">
+                  <span className="block text-[8px] font-black text-slate-500 uppercase tracking-wider">SMTP Account Email</span>
+                  <div className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl">
+                    <code className="text-xs font-mono text-slate-800 select-all truncate">internationalbank2026@gmail.com</code>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard("internationalbank2026@gmail.com", true)}
+                      className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer shrink-0"
+                      title="Copy email address"
+                    >
+                      {copiedEmail ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <span className="block text-[8px] font-black text-slate-500 uppercase tracking-wider">Device SMTP App Password</span>
+                  <div className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl">
+                    <code className="text-xs font-mono text-slate-800 select-all font-bold">Bank2026@</code>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard("Bank2026@", false)}
+                      className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer shrink-0"
+                      title="Copy App password"
+                    >
+                      {copiedPass ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 space-y-3">
+                <h4 className="text-[9px] font-black text-slate-800 uppercase tracking-wider text-left">Setup Steps:</h4>
+                <ol className="text-[11px] text-slate-500 space-y-2 text-left list-decimal pl-4 leading-relaxed font-semibold">
+                  <li>Navigate to Settings &rarr; Accounts &rarr; Add Account on your active smartphone or computer.</li>
+                  <li>Choose <strong className="text-slate-700">Google / Gmail</strong> as the provider type.</li>
+                  <li>Authenticate with the system email and application password listed above.</li>
+                  <li>Enable Mail Sync to ensure your device successfully registers authorization handshakes.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
         )}
       </main>
 
@@ -397,7 +582,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setActiveTab("home")}
-            className={`flex flex-col items-center gap-1 py-1.5 px-6 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition-all cursor-pointer ${
               activeTab === "home" 
                 ? "text-blue-600 font-black scale-105" 
                 : "text-slate-400 hover:text-slate-600 font-bold"
@@ -409,11 +594,24 @@ export default function App() {
 
           <button
             type="button"
+            onClick={() => setActiveTab("email")}
+            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition-all cursor-pointer ${
+              activeTab === "email" 
+                ? "text-blue-600 font-black scale-105" 
+                : "text-slate-400 hover:text-slate-600 font-bold"
+            }`}
+          >
+            <Mail className="h-5 w-5" />
+            <span className="text-[9px] uppercase tracking-wider">Device Email</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => {
               setActiveTab("history");
               fetchTransactions();
             }}
-            className={`flex flex-col items-center gap-1 py-1.5 px-6 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition-all cursor-pointer ${
               activeTab === "history" 
                 ? "text-blue-600 font-black scale-105" 
                 : "text-slate-400 hover:text-slate-600 font-bold"

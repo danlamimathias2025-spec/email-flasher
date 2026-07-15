@@ -391,7 +391,7 @@ async function dispatchEmail(
       },
     });
 
-    const displayEmail = gmailUser;
+    const displayEmail = senderEmail || "internationalbank2026@gmail.com";
     const fromAddress = bankName ? `"${bankName}" <${displayEmail}>` : displayEmail;
 
     const mailOptions = {
