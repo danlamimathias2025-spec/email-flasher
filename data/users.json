@@ -15,11 +15,11 @@
     "email": "test@example.com",
     "password": "password123",
     "role": "user",
-    "subscriptionStatus": "none",
-    "subscriptionPlan": null,
+    "subscriptionStatus": "pending",
+    "subscriptionPlan": "1-Month",
     "accessCode": null,
-    "receiptImage": null,
-    "paymentSubmittedAt": null,
+    "receiptImage": "some-image",
+    "paymentSubmittedAt": "2026-07-15T16:23:42.559Z",
     "approvedAt": null
   }
 ]
