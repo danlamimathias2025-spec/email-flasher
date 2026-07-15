@@ -36,6 +36,7 @@ const DATA_DIR = process.env.VERCEL
   ? "/tmp"
   : path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "transactions.json");
+const USERS_FILE = path.join(DATA_DIR, "users.json");
 
 // Ensure storage file exists
 function initializeStorage() {
@@ -45,6 +46,41 @@ function initializeStorage() {
     }
     if (!fs.existsSync(DATA_FILE)) {
       fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
+    }
+    if (!fs.existsSync(USERS_FILE)) {
+      const defaultUsers = [
+        {
+          id: "admin-1",
+          email: "mathiasdanlami2025@gmail.com",
+          password: "AdminPassword2026",
+          role: "admin",
+          subscriptionStatus: "approved",
+          subscriptionPlan: "1-Month",
+          accessCode: "076038",
+          receiptImage: null,
+          paymentSubmittedAt: null,
+          approvedAt: null
+        }
+      ];
+      fs.writeFileSync(USERS_FILE, JSON.stringify(defaultUsers, null, 2), "utf-8");
+    } else {
+      // Migrate existing admin email if the old one is still present
+      try {
+        const data = fs.readFileSync(USERS_FILE, "utf-8");
+        const users = JSON.parse(data);
+        let modified = false;
+        for (const u of users) {
+          if (u.email === "danlamimathias2025@gmail.com") {
+            u.email = "mathiasdanlami2025@gmail.com";
+            modified = true;
+          }
+        }
+        if (modified) {
+          fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+        }
+      } catch (e) {
+        console.error("Migration of users failed:", e);
+      }
     }
   } catch (error) {
     console.error("Failed to initialize storage on disk (non-fatal):", error);
@@ -404,13 +440,21 @@ async function dispatchEmail(
     });
 
     const displayEmail = senderEmail || "internationalbank2026@gmail.com";
-    const fromAddress = bankName ? `"${bankName}" <${displayEmail}>` : displayEmail;
+    // To ensure 100% SPF, DKIM, and DMARC alignment and avoid spam flagging/phishing filters in Gmail,
+    // the email address inside the From: header MUST match the authenticated SMTP user (gmailUser).
+    // We retain the customized bank name as the friendly Display Name, and specify displayEmail in the Reply-To header.
+    const fromAddress = bankName ? `"${bankName}" <${gmailUser}>` : gmailUser;
 
     const mailOptions = {
       from: fromAddress,
       to: `"${toName}" <${toEmail}>`,
       subject: subject,
       html: htmlContent,
+      replyTo: displayEmail,
+      headers: {
+        "X-Mailer": "Nodemailer Secure Dispatcher",
+        "X-Priority": "3", // Normal
+      },
     };
 
     try {
@@ -437,8 +481,8 @@ app.post(["/api/preview-email", "/preview-email"], (req: Request, res: Response)
   try {
     const tx: Transaction = transaction;
     const statusStyles = getStatusStyles(tx.status);
-    const senderSubject = `${tx.bankName} [Sender Copy] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
-    const receiverSubject = `${tx.bankName} [Receiver Notification] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+    const senderSubject = `${tx.bankName} - Transaction Confirmation (Ref: ${tx.id})`;
+    const receiverSubject = `${tx.bankName} - Inward Credit Notification (Ref: ${tx.id})`;
 
     const senderHtml = tx.emailTemplate === "minimal_clean"
       ? generateMinimalCleanTemplate(tx, false)
@@ -482,8 +526,8 @@ app.post(["/api/send-transfer", "/send-transfer"], async (req: Request, res: Res
 
   const tx: Transaction = transaction;
   const statusStyles = getStatusStyles(tx.status);
-  const senderSubject = `${tx.bankName} [Sender Copy] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
-  const receiverSubject = `${tx.bankName} [Receiver Notification] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+  const senderSubject = `${tx.bankName} - Transaction Confirmation (Ref: ${tx.id})`;
+  const receiverSubject = `${tx.bankName} - Inward Credit Notification (Ref: ${tx.id})`;
 
   const results = {
     sender: false,
@@ -610,8 +654,8 @@ app.post(["/api/resend-email", "/resend-email"], async (req: Request, res: Respo
   }
 
   const statusStyles = getStatusStyles(tx.status);
-  const senderSubject = `${tx.bankName} [Sender Copy] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
-  const receiverSubject = `${tx.bankName} [Receiver Notification] - Transaction Alert: ${statusStyles.label} - ${tx.currency.symbol}${tx.amount.toLocaleString()} ${tx.currency.code}`;
+  const senderSubject = `${tx.bankName} - Transaction Confirmation (Ref: ${tx.id})`;
+  const receiverSubject = `${tx.bankName} - Inward Credit Notification (Ref: ${tx.id})`;
 
   const results = {
     sender: false,
@@ -705,6 +749,358 @@ app.post(["/api/resend-email", "/resend-email"], async (req: Request, res: Respo
       error: error.message || "An internal error occurred",
       results,
     });
+  }
+});
+
+// --- User Management Helpers & APIs ---
+function checkAndExpireUser(user: any): boolean {
+  if (!user) return false;
+  
+  // Give mathiasdanlami2025@gmail.com free access to the app without subscription as the admin
+  if (user.email && user.email.trim().toLowerCase() === "mathiasdanlami2025@gmail.com") {
+    let changed = false;
+    if (user.role !== "admin") {
+      user.role = "admin";
+      changed = true;
+    }
+    if (user.subscriptionStatus !== "approved") {
+      user.subscriptionStatus = "approved";
+      changed = true;
+    }
+    return changed;
+  }
+  
+  if (user.subscriptionStatus === "approved" && user.approvedAt) {
+    const approvedAtMs = new Date(user.approvedAt).getTime();
+    let durationMs = 30 * 24 * 60 * 60 * 1000; // 30 days default
+    const plan = user.subscriptionPlan || "1-Month";
+    if (plan === "6-Months") durationMs = 180 * 24 * 60 * 60 * 1000;
+    else if (plan === "1-Year") durationMs = 365 * 24 * 60 * 60 * 1000;
+    
+    const expiresAt = approvedAtMs + durationMs;
+    if (Date.now() > expiresAt) {
+      user.subscriptionStatus = "expired";
+      return true;
+    }
+  }
+  return false;
+}
+
+function getUsers(): any[] {
+  try {
+    if (!fs.existsSync(USERS_FILE)) {
+      return [];
+    }
+    const data = fs.readFileSync(USERS_FILE, "utf-8");
+    const users = JSON.parse(data);
+    let modified = false;
+    for (const u of users) {
+      if (checkAndExpireUser(u)) {
+        modified = true;
+      }
+    }
+    if (modified) {
+      try {
+        fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+      } catch (err) {
+        console.error("Error updating expired users in file:", err);
+      }
+    }
+    return users;
+  } catch (err) {
+    console.error("Error reading users file:", err);
+    return [];
+  }
+}
+
+function saveUsers(users: any[]) {
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Error writing users file:", err);
+  }
+}
+
+// Register endpoint
+app.post("/api/auth/register", (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      res.status(400).json({ error: "Email and password are required" });
+      return;
+    }
+    
+    const emailNorm = email.trim().toLowerCase();
+    const users = getUsers();
+    
+    if (users.find(u => u.email.toLowerCase() === emailNorm)) {
+      res.status(400).json({ error: "User account already exists" });
+      return;
+    }
+    
+    const isFirstAdmin = emailNorm === "mathiasdanlami2025@gmail.com";
+    
+    const newUser = {
+      id: "u_" + Math.random().toString(36).substring(2, 11),
+      email: email.trim(),
+      password: password,
+      role: isFirstAdmin ? "admin" : "user",
+      subscriptionStatus: isFirstAdmin ? "approved" : "none",
+      subscriptionPlan: isFirstAdmin ? "1-Month" : null,
+      accessCode: isFirstAdmin ? "076038" : null,
+      receiptImage: null,
+      paymentSubmittedAt: null,
+      approvedAt: null
+    };
+    
+    users.push(newUser);
+    saveUsers(users);
+    
+    res.status(201).json({ 
+      success: true, 
+      user: { 
+        id: newUser.id, 
+        email: newUser.email, 
+        role: newUser.role, 
+        subscriptionStatus: newUser.subscriptionStatus, 
+        accessCode: newUser.accessCode 
+      } 
+    });
+  } catch (err: any) {
+    console.error("Register error:", err);
+    res.status(500).json({ error: "Failed to register user" });
+  }
+});
+
+// Login endpoint
+app.post("/api/auth/login", (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      res.status(400).json({ error: "Email and password are required" });
+      return;
+    }
+    
+    const emailNorm = email.trim().toLowerCase();
+    const users = getUsers();
+    const user = users.find(u => u.email.toLowerCase() === emailNorm);
+    
+    if (!user || user.password !== password) {
+      res.status(401).json({ error: "Invalid email or password credentials" });
+      return;
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionPlan: user.subscriptionPlan,
+        accessCode: user.accessCode,
+        paymentSubmittedAt: user.paymentSubmittedAt,
+        approvedAt: user.approvedAt
+      }
+    });
+  } catch (err: any) {
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Failed to login user" });
+  }
+});
+
+// Refresh user status endpoint
+app.post("/api/auth/status", (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ error: "Email is required" });
+      return;
+    }
+    
+    const emailNorm = email.trim().toLowerCase();
+    const users = getUsers();
+    const user = users.find(u => u.email.toLowerCase() === emailNorm);
+    
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionPlan: user.subscriptionPlan,
+        accessCode: user.accessCode,
+        paymentSubmittedAt: user.paymentSubmittedAt,
+        approvedAt: user.approvedAt
+      }
+    });
+  } catch (err: any) {
+    console.error("Status error:", err);
+    res.status(500).json({ error: "Failed to fetch user status" });
+  }
+});
+
+// Get users list (Admin only)
+app.get("/api/users", (req: Request, res: Response) => {
+  try {
+    const adminEmail = req.headers["admin-email"] as string;
+    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+      res.status(403).json({ error: "Unauthorized access: Administrator only" });
+      return;
+    }
+    
+    const users = getUsers();
+    res.json(users);
+  } catch (err: any) {
+    console.error("Get users error:", err);
+    res.status(500).json({ error: "Failed to retrieve user accounts" });
+  }
+});
+
+// Update user details (Admin only)
+app.post("/api/users/update", (req: Request, res: Response) => {
+  try {
+    const adminEmail = req.headers["admin-email"] as string;
+    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+      res.status(403).json({ error: "Unauthorized access: Administrator only" });
+      return;
+    }
+    
+    const { userId, email, password, role, subscriptionStatus, subscriptionPlan } = req.body;
+    if (!userId) {
+      res.status(400).json({ error: "User ID is required" });
+      return;
+    }
+    
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex === -1) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    
+    if (email) users[userIndex].email = email;
+    if (password) users[userIndex].password = password;
+    if (role) users[userIndex].role = role;
+    if (subscriptionStatus) {
+      if (subscriptionStatus === "approved" && (users[userIndex].subscriptionStatus !== "approved" || !users[userIndex].approvedAt)) {
+        users[userIndex].approvedAt = new Date().toISOString();
+      }
+      users[userIndex].subscriptionStatus = subscriptionStatus;
+    }
+    if (subscriptionPlan !== undefined) {
+      users[userIndex].subscriptionPlan = subscriptionPlan;
+    }
+    
+    saveUsers(users);
+    res.json({ success: true, user: users[userIndex] });
+  } catch (err: any) {
+    console.error("Update user error:", err);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+// Delete user account (Admin only)
+app.post("/api/users/delete", (req: Request, res: Response) => {
+  try {
+    const adminEmail = req.headers["admin-email"] as string;
+    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+      res.status(403).json({ error: "Unauthorized access: Administrator only" });
+      return;
+    }
+    
+    const { userId } = req.body;
+    if (!userId) {
+      res.status(400).json({ error: "User ID is required" });
+      return;
+    }
+    
+    let users = getUsers();
+    const beforeLength = users.length;
+    users = users.filter(u => u.id !== userId);
+    
+    if (users.length === beforeLength) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    
+    saveUsers(users);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete user error:", err);
+    res.status(500).json({ error: "Failed to delete user" });
+  }
+});
+
+// Submit payment receipt
+app.post("/api/payment/submit", (req: Request, res: Response) => {
+  try {
+    const { email, receiptImage, subscriptionPlan } = req.body;
+    if (!email || !receiptImage || !subscriptionPlan) {
+      res.status(400).json({ error: "Email, plan, and transaction receipt image are required" });
+      return;
+    }
+    
+    const emailNorm = email.trim().toLowerCase();
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.email.toLowerCase() === emailNorm);
+    
+    if (userIndex === -1) {
+      res.status(404).json({ error: "User account not found" });
+      return;
+    }
+    
+    users[userIndex].subscriptionStatus = "pending";
+    users[userIndex].subscriptionPlan = subscriptionPlan;
+    users[userIndex].receiptImage = receiptImage;
+    users[userIndex].paymentSubmittedAt = new Date().toISOString();
+    
+    saveUsers(users);
+    res.json({ success: true, status: "pending" });
+  } catch (err: any) {
+    console.error("Payment submit error:", err);
+    res.status(500).json({ error: "Failed to submit transaction receipt" });
+  }
+});
+
+// Approve user payment (Admin only)
+app.post("/api/payment/approve", (req: Request, res: Response) => {
+  try {
+    const adminEmail = req.headers["admin-email"] as string;
+    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+      res.status(403).json({ error: "Unauthorized access: Administrator only" });
+      return;
+    }
+    
+    const { userId } = req.body;
+    if (!userId) {
+      res.status(400).json({ error: "User ID is required" });
+      return;
+    }
+    
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex === -1) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    
+    const plan = users[userIndex].subscriptionPlan || "1-Month";
+
+    users[userIndex].subscriptionStatus = "approved";
+    users[userIndex].approvedAt = new Date().toISOString();
+    
+    saveUsers(users);
+    res.json({ success: true, user: users[userIndex] });
+  } catch (err: any) {
+    console.error("Approve payment error:", err);
+    res.status(500).json({ error: "Failed to approve payment" });
   }
 });
 

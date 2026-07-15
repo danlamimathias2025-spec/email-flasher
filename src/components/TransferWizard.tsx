@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef } from "react";
+import { motion } from "motion/react";
 import { z } from "zod";
 import { 
   Building, 
@@ -22,7 +23,8 @@ import {
   X,
   CreditCard,
   Send,
-  Eye
+  Eye,
+  Check
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Transaction, Currency, TransactionStatus } from "../types";
@@ -575,20 +577,105 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   if (createdTx) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden flex flex-col h-full animate-fade-in" id="success-view">
-        <div className="bg-slate-900 px-6 py-8 text-center border-b border-slate-800 text-white shrink-0">
-          <div className="mx-auto w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center text-emerald-400 mb-4 shadow-lg shadow-emerald-950/20">
-            <CheckCircle className="h-8 w-8" />
+        <div className="bg-slate-900 px-6 py-8 text-center border-b border-slate-800 text-white shrink-0 overflow-hidden relative">
+          {/* Subtle animated background grid/glow */}
+          <motion.div 
+            className="absolute -inset-10 bg-emerald-500/5 rounded-full filter blur-3xl"
+            animate={{ 
+              scale: [1, 1.15, 1],
+              opacity: [0.3, 0.6, 0.3]
+            }}
+            transition={{
+              duration: 4,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+
+          <div className="relative mx-auto w-20 h-20 flex items-center justify-center mb-4">
+            {/* Pulsing ripple rings */}
+            <motion.div
+              className="absolute inset-0 bg-emerald-500/15 rounded-full"
+              initial={{ scale: 0.8, opacity: 0.5 }}
+              animate={{ scale: 1.8, opacity: 0 }}
+              transition={{ repeat: Infinity, duration: 2, ease: "easeOut" }}
+            />
+            <motion.div
+              className="absolute inset-0 bg-emerald-500/10 rounded-full"
+              initial={{ scale: 0.8, opacity: 0.6 }}
+              animate={{ scale: 2.3, opacity: 0 }}
+              transition={{ repeat: Infinity, duration: 2, ease: "easeOut", delay: 0.6 }}
+            />
+            
+            {/* Exploding success particles */}
+            {[...Array(8)].map((_, i) => {
+              const angle = (i * 360) / 8;
+              const radians = (angle * Math.PI) / 180;
+              const x = Math.cos(radians) * 44;
+              const y = Math.sin(radians) * 44;
+              return (
+                <motion.div
+                  key={i}
+                  className="absolute w-1.5 h-1.5 rounded-full bg-emerald-400"
+                  initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
+                  animate={{ x, y, scale: [0, 1.25, 0], opacity: [1, 1, 0] }}
+                  transition={{
+                    duration: 0.9,
+                    ease: "easeOut",
+                    delay: 0.2,
+                  }}
+                />
+              );
+            })}
+
+            {/* Core Check Icon with spring pop-in */}
+            <motion.div 
+              className="relative w-14 h-14 bg-emerald-500 border border-emerald-400 rounded-full flex items-center justify-center text-white shadow-lg shadow-emerald-950/40 z-10"
+              initial={{ scale: 0, rotate: -75 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ 
+                type: "spring", 
+                stiffness: 280, 
+                damping: 18,
+                delay: 0.05
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.25, duration: 0.2 }}
+              >
+                <CheckCircle className="h-7 w-7 stroke-[2.5]" />
+              </motion.div>
+            </motion.div>
           </div>
-          <h2 className="text-xl font-bold tracking-tight text-white uppercase">
+
+          <motion.h2 
+            className="text-xl font-bold tracking-tight text-white uppercase relative z-10"
+            initial={{ y: 15, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.35, duration: 0.4 }}
+          >
             TRANSFER PROCESSED
-          </h2>
-          <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-black">
+          </motion.h2>
+          
+          <motion.p 
+            className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-black relative z-10"
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.4 }}
+          >
             Transaction Code: {createdTx.id}
-          </p>
+          </motion.p>
         </div>
 
         <div className="p-6 md:p-8 space-y-6 flex-1 flex flex-col justify-between overflow-y-auto">
-          <div className="space-y-6">
+          <motion.div 
+            className="space-y-6"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.55, duration: 0.5 }}
+          >
             <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-5 space-y-3 text-xs text-slate-700">
               <h3 className="font-bold text-slate-800 uppercase tracking-widest text-[10px] border-b border-slate-200 pb-2">
                 Secure Transfer Receipt Details
@@ -651,7 +738,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
                 <p className="leading-relaxed">{sendNowResult.text}</p>
               </div>
             )}
-          </div>
+          </motion.div>
 
           <div className="space-y-3.5 pt-6 border-t border-slate-150">
             {/* EMAIL DISPATCH CONTROLS */}
@@ -741,19 +828,26 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden flex flex-col h-full" id="transfer-wizard">
       {/* Wizard Step Indicator Header */}
-      <div className="bg-slate-950 px-6 py-6 border-b border-slate-800 text-white">
-        <div className="mb-4 text-center">
-          <h2 className="text-lg font-bold tracking-tight text-white flex items-center justify-center gap-2">
-            <Building className="h-5 w-5 text-blue-500" />
-            SECURE RECEIPT & EMAIL TERMINAL
+      <div className="bg-gradient-to-b from-[#0a192f] to-[#0f213a] px-6 py-6 border-b border-slate-800 text-white relative">
+        {/* Subtle decorative grid lines overlay */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:14px_24px]" />
+        
+        <div className="mb-4 text-center relative z-10">
+          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-950/80 border border-blue-500/20 text-blue-400 rounded-full text-[8px] font-bold uppercase tracking-widest mb-2 font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            SECURE LEDGER DISPATCH CHANNEL ACTIVE
+          </div>
+          <h2 className="text-base font-black tracking-tight text-white flex items-center justify-center gap-2">
+            <Building className="h-4.5 w-4.5 text-blue-400 stroke-[2]" />
+            SECURE RECEIPT & NOTIFICATION GATE
           </h2>
           <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-black">
-            Authorized Transfer & Real-time Notification Engine
+            Institutional Transfer & Real-time Dispatch
           </p>
         </div>
 
         {/* Step dots */}
-        <div className="flex items-center justify-between mt-6 max-w-sm mx-auto">
+        <div className="flex items-center justify-between mt-6 max-w-sm mx-auto relative z-10">
           {[1, 2, 3, 4].map((step) => (
             <React.Fragment key={step}>
               <button
@@ -762,24 +856,24 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
                 className="flex flex-col items-center focus:outline-none group cursor-pointer"
               >
                 <div
-                  className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-[10px] transition-all duration-300 ${
+                  className={`h-9 w-9 rounded-full flex items-center justify-center font-black text-[11px] transition-all duration-300 ${
                     currentStep === step
-                      ? "bg-blue-600 text-white ring-4 ring-blue-500/20 font-black shadow-lg"
+                      ? "bg-blue-600 text-white ring-4 ring-blue-500/25 font-black shadow-lg shadow-blue-900/40"
                       : currentStep > step
-                      ? "bg-green-600 text-white font-black group-hover:bg-green-500"
-                      : "bg-slate-900 text-slate-500 border border-slate-800 group-hover:border-slate-750"
+                      ? "bg-emerald-600 text-white font-black group-hover:bg-emerald-500"
+                      : "bg-slate-900/90 text-slate-500 border border-slate-800 group-hover:border-slate-700"
                   }`}
                 >
-                  {step}
+                  {currentStep > step ? <Check className="h-4 w-4 stroke-[3]" /> : step}
                 </div>
-                <span className="text-[9px] text-slate-400 mt-2 font-black uppercase tracking-widest transition group-hover:text-slate-300">
-                  {step === 1 ? "Setup" : step === 2 ? "Sender" : step === 3 ? "Receiver" : "Preview"}
+                <span className="text-[9px] text-slate-400 mt-2 font-black uppercase tracking-widest transition group-hover:text-slate-200">
+                  {step === 1 ? "Setup" : step === 2 ? "Sender" : step === 3 ? "Receiver" : "Review"}
                 </span>
               </button>
               {step < 4 && (
                 <div
                   className={`h-[2px] flex-1 mx-2 transition-all duration-500 ${
-                    currentStep > step ? "bg-green-600" : "bg-slate-800"
+                    currentStep > step ? "bg-emerald-600" : "bg-slate-800"
                   }`}
                 />
               )}

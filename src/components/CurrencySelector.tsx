@@ -60,7 +60,7 @@ export default function CurrencySelector({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all cursor-pointer"
+        className="flex items-center justify-between w-full px-4 py-3 bg-white border border-slate-200/95 rounded-xl shadow-sm text-left focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all cursor-pointer"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
