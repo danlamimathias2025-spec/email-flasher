@@ -44,7 +44,8 @@ import {
   Trash,
   Edit,
   Settings,
-  Key
+  Key,
+  Printer
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 import { Transaction, TransactionStatus } from "./types";
@@ -1675,13 +1676,23 @@ export default function App() {
                   <p className="text-[8px] font-mono text-slate-400 uppercase tracking-widest font-black">REF: {selectedTransaction.id}</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedTransaction(null)}
-                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                  title="Print Receipt"
+                >
+                  <Printer className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTransaction(null)}
+                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Content Scroll Area */}
