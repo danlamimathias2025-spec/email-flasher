@@ -19,6 +19,18 @@ const PORT = 3000;
 // Enable JSON bodies with higher limits for base64 logos
 app.use(express.json({ limit: "50mb" }));
 
+// Normalize Vercel Serverless routing variations (ensure /api/... is matched properly)
+app.use((req, res, next) => {
+  if (req.url && !req.url.startsWith("/api/")) {
+    const knownEndpoints = ["/transactions", "/preview-email", "/send-transfer", "/resend-email"];
+    const pathName = req.url.split("?")[0];
+    if (knownEndpoints.includes(pathName)) {
+      req.url = "/api" + req.url;
+    }
+  }
+  next();
+});
+
 // File storage configuration for transaction history - Vercel read-only safe
 const DATA_DIR = process.env.VERCEL
   ? "/tmp"
@@ -90,14 +102,14 @@ function saveTransactions(transactions: Transaction[]) {
 }
 
 // REST API endpoints
-app.get("/api/transactions", (req: Request, res: Response) => {
+app.get(["/api/transactions", "/transactions"], (req: Request, res: Response) => {
   const list = getTransactions();
   // Sort by date or createdAt descending
   list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   res.json(list);
 });
 
-app.post("/api/transactions", (req: Request, res: Response) => {
+app.post(["/api/transactions", "/transactions"], (req: Request, res: Response) => {
   const tx: Transaction = req.body;
   if (!tx.id || !tx.bankName || !tx.amount) {
     res.status(400).json({ error: "Missing required transaction fields" });
@@ -114,7 +126,7 @@ app.post("/api/transactions", (req: Request, res: Response) => {
   res.status(201).json(tx);
 });
 
-app.delete("/api/transactions", (req: Request, res: Response) => {
+app.delete(["/api/transactions", "/transactions"], (req: Request, res: Response) => {
   try {
     saveTransactions([]);
     res.json({ success: true, message: "Transaction history cleared successfully." });
@@ -415,7 +427,7 @@ async function dispatchEmail(
 }
 
 // POST endpoint to generate previews for sender and receiver email templates
-app.post("/api/preview-email", (req: Request, res: Response) => {
+app.post(["/api/preview-email", "/preview-email"], (req: Request, res: Response) => {
   const { transaction } = req.body;
   if (!transaction) {
     res.status(400).json({ error: "Missing transaction parameters for preview" });
@@ -449,7 +461,7 @@ app.post("/api/preview-email", (req: Request, res: Response) => {
 });
 
 // POST endpoint to perform the actual transaction mailers
-app.post("/api/send-transfer", async (req: Request, res: Response) => {
+app.post(["/api/send-transfer", "/send-transfer"], async (req: Request, res: Response) => {
   const { transaction, sendSender = true, sendReceiver = true, mailjetSenderEmail, gmailSenderEmail, brevoSenderEmail } = req.body;
   if (!transaction) {
     res.status(400).json({ error: "Missing transaction parameters" });
@@ -570,7 +582,7 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
 });
 
 // POST endpoint to manually resend emails for an existing transaction
-app.post("/api/resend-email", async (req: Request, res: Response) => {
+app.post(["/api/resend-email", "/resend-email"], async (req: Request, res: Response) => {
   const { transactionId, transaction, sendSender = true, sendReceiver = true, mailjetSenderEmail, gmailSenderEmail, brevoSenderEmail } = req.body;
   
   let tx = transaction;
