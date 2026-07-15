@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import GlobalApexLogo from "./assets/images/global_apex_logo_1784130592412.jpg";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { SplashScreen } from "./components/SplashScreen";
 import { 
   Building, 
   Lock, 
@@ -58,6 +60,7 @@ interface AccessSession {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const [isLocalMode, setIsLocalMode] = useState(false);
   const [activeTab, setActiveTab] = useState<"home" | "history" | "email" | "profile" | "admin">("home");
 
@@ -626,8 +629,8 @@ export default function App() {
           <div className="p-8 space-y-6">
             {/* Header */}
             <div className="text-center space-y-2">
-              <div className="mx-auto w-14 h-14 bg-gradient-to-tr from-blue-950 to-blue-900 border border-blue-800/50 rounded-2xl flex items-center justify-center shadow-lg mb-1">
-                <ShieldCheck className="h-7 w-7 text-blue-400" />
+              <div className="mx-auto w-14 h-14 bg-blue-950/20 border border-blue-800/50 rounded-2xl flex items-center justify-center shadow-lg mb-1 overflow-hidden">
+                <img src={GlobalApexLogo} alt="Global Apex Logo" className="w-full h-full object-cover" />
               </div>
               <h2 className="text-2xl font-black tracking-tight text-white uppercase font-sans">
                 GLOBAL PLATFORM ACCOUNT
@@ -967,6 +970,11 @@ export default function App() {
   // CORE WORKSPACE VIEW
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col pb-20" id="app-root">
+      <AnimatePresence>
+        {showSplash ? (
+          <SplashScreen logo={GlobalApexLogo} onComplete={() => setShowSplash(false)} />
+        ) : null}
+      </AnimatePresence>
       <Toaster 
         position="top-right"
         toastOptions={{
@@ -998,48 +1006,34 @@ export default function App() {
         }}
       />
       {/* Top Header */}
-      <header className="h-16 bg-white border-b border-slate-200/60 flex items-center justify-between px-6 sm:px-8 sticky top-0 z-40 shadow-sm shrink-0">
+      <header className="h-16 mt-4 mx-4 bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-sm flex items-center justify-between px-6 sticky top-4 z-40 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-tr from-[#0a192f] to-[#172a45] rounded-xl flex items-center justify-center text-white font-black shadow-md border border-slate-800/20 relative overflow-hidden">
-            <div className="absolute inset-0 bg-blue-500/10" />
-            <Shield className="h-5 w-5 text-blue-400 stroke-[2] relative z-10" />
+          <div className="w-8 h-8 bg-blue-950/20 border border-blue-800/50 rounded-lg flex items-center justify-center shadow-md overflow-hidden">
+            <img src={GlobalApexLogo} alt="Global Apex Logo" className="w-full h-full object-cover" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-sm font-black tracking-tight text-slate-900 leading-none uppercase">GLOBAL APEX</h1>
-              <span className="text-[7px] bg-blue-150 text-blue-700 font-extrabold px-1.5 py-0.5 rounded uppercase font-mono">PRO</span>
-            </div>
-            <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black mt-0.5">INSTITUTIONAL CORE TERMINAL</p>
+            <h1 className="text-xs font-black tracking-tight text-slate-900 leading-none uppercase">GLOBAL APEX</h1>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
-          {accountUser?.email && (
-            <div className="hidden sm:flex flex-col items-end text-right">
-              <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider">Session Profile</span>
-              <span className="text-[10px] font-bold text-slate-700 font-mono">{accountUser?.email}</span>
-            </div>
-          )}
-
+        <div className="flex items-center gap-3">
+          {/* Status - simplified to fit */}
           {isLocalMode ? (
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200/80 text-amber-700 text-[9px] font-black rounded-full uppercase tracking-wider">
-              <WifiOff className="h-3 w-3" />
-              Local Mode
+            <div className="px-2 py-0.5 bg-amber-50 border border-amber-200/80 text-amber-700 text-[8px] font-black rounded-full uppercase">
+              Local
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[9px] font-black rounded-full uppercase tracking-wider">
-              <ShieldCheck className="h-3 w-3" />
-              API Active
+            <div className="px-2 py-0.5 bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[8px] font-black rounded-full uppercase">
+              API
             </div>
           )}
 
           <button 
             onClick={handleAccountLogout}
-            title="Logout of terminal"
-            className="flex items-center gap-1 text-[9px] font-black text-rose-600 hover:text-rose-700 uppercase tracking-wider border border-rose-100 hover:bg-rose-50 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+            title="Logout"
+            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all cursor-pointer"
           >
-            <LogOut className="h-3 w-3" />
-            Logout
+            <LogOut className="h-4 w-4" />
           </button>
         </div>
       </header>

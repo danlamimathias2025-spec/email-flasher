@@ -46,8 +46,8 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   const [createdTx, setCreatedTx] = useState<Transaction | null>(null);
   const [sendNowLoading, setSendNowLoading] = useState(false);
   const [sendNowResult, setSendNowResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [shouldSendSender, setShouldSendSender] = useState(false);
-  const [shouldSendReceiver, setShouldSendReceiver] = useState(false);
+  const [shouldSendSender, setShouldSendSender] = useState(true);
+  const [shouldSendReceiver, setShouldSendReceiver] = useState(true);
   const [gmailSenderEmail, setGmailSenderEmail] = useState(() => {
     return localStorage.getItem("gmail_sender_email") || localStorage.getItem("mailjet_sender_email") || localStorage.getItem("brevo_sender_email") || "internationalbank2026@gmail.com";
   });
@@ -755,11 +755,8 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
                 <input
                   type="email"
                   value={gmailSenderEmail}
-                  onChange={(e) => {
-                    setGmailSenderEmail(e.target.value);
-                    localStorage.setItem("gmail_sender_email", e.target.value);
-                  }}
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-800 bg-white outline-none"
+                  readOnly
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-500 bg-slate-100/50 outline-none cursor-not-allowed"
                   placeholder="user@gmail.com"
                 />
                 <p className="text-[9px] text-slate-400 leading-normal font-medium">
@@ -1726,11 +1723,8 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
                   required
                   placeholder="e.g. user@gmail.com"
                   value={gmailSenderEmail}
-                  onChange={(e) => {
-                    setGmailSenderEmail(e.target.value);
-                    localStorage.setItem("gmail_sender_email", e.target.value);
-                  }}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none"
+                  readOnly
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-500 bg-slate-100/50 focus:ring-0 outline-none cursor-not-allowed"
                 />
                 <p className="text-[9px] text-slate-400 font-medium leading-normal">
                   ⚠️ <strong>Important:</strong> Google SMTP expects this email to match your authenticated Gmail account or a configured <strong>Send Mail As</strong> alias.
