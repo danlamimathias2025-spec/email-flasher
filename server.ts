@@ -7,8 +7,8 @@ import express, { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
-import { createServer as createViteServer } from "vite";
 import { Transaction, TransactionStatus } from "./src/types";
+import nodemailer from "nodemailer";
 
 // Load environment variables
 dotenv.config();
@@ -366,10 +366,8 @@ function generateMinimalCleanTemplate(tx: Transaction, isReceiver: boolean): str
   return generateModernPaperReceipt(tx, isReceiver);
 }
 
-// Mailjet API email dispatcher
-async function sendMailjetEmail(
-  publicKey: string,
-  privateKey: string,
+// Unified email dispatcher supporting Gmail SMTP via Nodemailer
+async function dispatchEmail(
   toEmail: string,
   toName: string,
   bankName: string,
@@ -377,107 +375,43 @@ async function sendMailjetEmail(
   htmlContent: string,
   senderEmail?: string
 ): Promise<boolean> {
-  const url = "https://api.mailjet.com/v3/send";
-  const fromEmail = senderEmail || process.env.MAILJET_SENDER_EMAIL || "transactions@mailjet-transfer.com";
-  
-  const body = {
-    FromEmail: fromEmail,
-    FromName: bankName,
-    Recipients: [
-      {
-        Email: toEmail,
-        Name: toName,
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailAppPass = process.env.GMAIL_APP_PASS;
+
+  if (gmailUser && gmailAppPass) {
+    console.log(`Dispatching email to ${toEmail} via Gmail SMTP...`);
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: gmailUser,
+        pass: gmailAppPass,
       },
-    ],
-    Subject: subject,
-    "Html-part": htmlContent,
-  };
+    });
 
-  const auth = Buffer.from(`${publicKey}:${privateKey}`).toString("base64");
+    const displayEmail = gmailUser;
+    const fromAddress = bankName ? `"${bankName}" <${displayEmail}>` : displayEmail;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Basic ${auth}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+    const mailOptions = {
+      from: fromAddress,
+      to: `"${toName}" <${toEmail}>`,
+      subject: subject,
+      html: htmlContent,
+    };
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Mailjet API Error (${response.status}): ${errorText}`);
-  }
-
-  return true;
-}
-
-// Resend API email dispatcher
-async function sendResendEmail(
-  apiKey: string,
-  toEmail: string,
-  toName: string,
-  bankName: string,
-  subject: string,
-  htmlContent: string
-): Promise<boolean> {
-  const url = "https://api.resend.com/emails";
-  const body = {
-    from: `${bankName} <onboarding@resend.dev>`,
-    to: toEmail,
-    subject: subject,
-    html: htmlContent,
-  };
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    const sandboxEmail = "danlamimathias2025@gmail.com";
-    if (toEmail !== sandboxEmail && (response.status === 403 || errorText.includes("validation_error") || errorText.includes("testing emails"))) {
-      console.warn(`Resend sandbox restriction hit for ${toEmail}. Retrying with verified sandbox email: ${sandboxEmail}`);
-      const fallbackHtml = `
-        <div style="background-color: #fffbeb; border: 1px solid #fef3c7; color: #b45309; padding: 16px; font-family: sans-serif; font-size: 14px; line-height: 1.5; margin-bottom: 24px; border-radius: 8px;">
-          <p style="margin: 0 0 8px 0; font-weight: bold; font-size: 15px; color: #92400e;">⚠️ Resend Sandbox Redirect</p>
-          <p style="margin: 0;">You are currently in Resend Sandbox Mode. Emails can only be sent to your registered email address (<strong>${sandboxEmail}</strong>). We have safely routed this alert to you.</p>
-          <p style="margin: 8px 0 0 0; font-size: 13px;">Original recipient was: <strong>${toEmail}</strong> (${toName})</p>
-        </div>
-      ` + htmlContent;
-
-      const retryBody = {
-        from: `${bankName} <onboarding@resend.dev>`,
-        to: sandboxEmail,
-        subject: `[Redirected Box] ${subject}`,
-        html: fallbackHtml,
-      };
-
-      const retryResponse = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(retryBody),
-      });
-
-      if (retryResponse.ok) {
-        return true;
-      } else {
-        const retryErrorText = await retryResponse.text();
-        throw new Error(`Resend Sandbox Redirect Failed: ${retryErrorText}`);
-      }
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`Email successfully sent to ${toEmail}`);
+      return true;
+    } catch (err: any) {
+      console.error("Nodemailer SMTP Error:", err);
+      throw new Error(`Gmail SMTP Dispatch Error: ${err.message || err}`);
     }
-    throw new Error(`Resend API Error (${response.status}): ${errorText}`);
   }
 
-  return true;
+  throw new Error("Gmail SMTP credentials (GMAIL_USER & GMAIL_APP_PASS) are not configured in environment variables.");
 }
 
 // POST endpoint to generate previews for sender and receiver email templates
@@ -516,20 +450,20 @@ app.post("/api/preview-email", (req: Request, res: Response) => {
 
 // POST endpoint to perform the actual transaction mailers
 app.post("/api/send-transfer", async (req: Request, res: Response) => {
-  const { transaction, sendSender = true, sendReceiver = true, mailjetSenderEmail, brevoSenderEmail } = req.body;
+  const { transaction, sendSender = true, sendReceiver = true, mailjetSenderEmail, gmailSenderEmail, brevoSenderEmail } = req.body;
   if (!transaction) {
     res.status(400).json({ error: "Missing transaction parameters" });
     return;
   }
 
   // Key Resolution: 
-  // Both sender and receiver emails will now use MJ_APIKEY_PUBLIC and MJ_APIKEY_PRIVATE
-  const mjPublic = process.env.MJ_APIKEY_PUBLIC;
-  const mjPrivate = process.env.MJ_APIKEY_PRIVATE;
+  // Supports Gmail SMTP (GMAIL_USER & GMAIL_APP_PASS)
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailAppPass = process.env.GMAIL_APP_PASS;
 
-  if ((sendSender || sendReceiver) && (!mjPublic || !mjPrivate)) {
+  if ((sendSender || sendReceiver) && (!gmailUser || !gmailAppPass)) {
     res.status(400).json({
-      error: "MJ_APIKEY_PUBLIC and/or MJ_APIKEY_PRIVATE are not configured. Please add your Mailjet API keys to the AI Studio Secrets panel or environment variables.",
+      error: "Gmail SMTP credentials are not configured on the server. Please add GMAIL_USER and GMAIL_APP_PASS to your Vercel/environment variables.",
     });
     return;
   }
@@ -545,7 +479,7 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
     error: "",
   };
 
-  const senderEmailToUse = mailjetSenderEmail || brevoSenderEmail;
+  const senderEmailToUse = gmailSenderEmail || mailjetSenderEmail || brevoSenderEmail;
 
   try {
     // 1. Generate HTML contents
@@ -557,12 +491,10 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
       ? generateMinimalCleanTemplate(tx, true)
       : generateModernBankTemplate(tx, true);
 
-    // 2. Send email to Sender via Mailjet API
-    if (sendSender && mjPublic && mjPrivate) {
+    // 2. Send email to Sender
+    if (sendSender) {
       try {
-        await sendMailjetEmail(
-          mjPublic,
-          mjPrivate,
+        await dispatchEmail(
           tx.sender.email,
           tx.sender.fullName,
           tx.bankName,
@@ -579,12 +511,10 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
       results.sender = false;
     }
 
-    // 3. Send email to Receiver via Mailjet API
-    if (sendReceiver && mjPublic && mjPrivate) {
+    // 3. Send email to Receiver
+    if (sendReceiver) {
       try {
-        await sendMailjetEmail(
-          mjPublic,
-          mjPrivate,
+        await dispatchEmail(
           tx.receiver.email,
           tx.receiver.fullName,
           tx.bankName,
@@ -641,7 +571,7 @@ app.post("/api/send-transfer", async (req: Request, res: Response) => {
 
 // POST endpoint to manually resend emails for an existing transaction
 app.post("/api/resend-email", async (req: Request, res: Response) => {
-  const { transactionId, transaction, sendSender = true, sendReceiver = true, mailjetSenderEmail, brevoSenderEmail } = req.body;
+  const { transactionId, transaction, sendSender = true, sendReceiver = true, mailjetSenderEmail, gmailSenderEmail, brevoSenderEmail } = req.body;
   
   let tx = transaction;
   if (!tx) {
@@ -657,12 +587,12 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
     }
   }
 
-  const mjPublic = process.env.MJ_APIKEY_PUBLIC;
-  const mjPrivate = process.env.MJ_APIKEY_PRIVATE;
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailAppPass = process.env.GMAIL_APP_PASS;
 
-  if ((sendSender || sendReceiver) && (!mjPublic || !mjPrivate)) {
+  if ((sendSender || sendReceiver) && (!gmailUser || !gmailAppPass)) {
     res.status(400).json({
-      error: "MJ_APIKEY_PUBLIC and/or MJ_APIKEY_PRIVATE are not configured. Please add your Mailjet API keys to the Secrets panel to send emails.",
+      error: "Gmail SMTP credentials are not configured on the server. Please add GMAIL_USER and GMAIL_APP_PASS to your Vercel/environment variables.",
     });
     return;
   }
@@ -677,7 +607,7 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
     error: "",
   };
 
-  const senderEmailToUse = mailjetSenderEmail || brevoSenderEmail;
+  const senderEmailToUse = gmailSenderEmail || mailjetSenderEmail || brevoSenderEmail;
 
   try {
     const senderHtml = tx.emailTemplate === "minimal_clean"
@@ -688,12 +618,10 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
       ? generateMinimalCleanTemplate(tx, true)
       : generateModernBankTemplate(tx, true);
 
-    // Send email to Sender via Mailjet API
-    if (sendSender && mjPublic && mjPrivate) {
+    // Send email to Sender
+    if (sendSender) {
       try {
-        await sendMailjetEmail(
-          mjPublic,
-          mjPrivate,
+        await dispatchEmail(
           tx.sender.email,
           tx.sender.fullName,
           tx.bankName,
@@ -708,12 +636,10 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
       }
     }
 
-    // Send email to Receiver via Mailjet API
-    if (sendReceiver && mjPublic && mjPrivate) {
+    // Send email to Receiver
+    if (sendReceiver) {
       try {
-        await sendMailjetEmail(
-          mjPublic,
-          mjPrivate,
+        await dispatchEmail(
           tx.receiver.email,
           tx.receiver.fullName,
           tx.bankName,
@@ -773,6 +699,7 @@ app.post("/api/resend-email", async (req: Request, res: Response) => {
 // Configure Vite integration for SPA fallback
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

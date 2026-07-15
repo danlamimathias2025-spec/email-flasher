@@ -46,8 +46,8 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   const [sendNowResult, setSendNowResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [shouldSendSender, setShouldSendSender] = useState(false);
   const [shouldSendReceiver, setShouldSendReceiver] = useState(false);
-  const [mailjetSenderEmail, setMailjetSenderEmail] = useState(() => {
-    return localStorage.getItem("mailjet_sender_email") || localStorage.getItem("brevo_sender_email") || "danlamimathias2025@gmail.com";
+  const [gmailSenderEmail, setGmailSenderEmail] = useState(() => {
+    return localStorage.getItem("gmail_sender_email") || localStorage.getItem("mailjet_sender_email") || localStorage.getItem("brevo_sender_email") || "danlamimathias2025@gmail.com";
   });
   
   // Validation Error State
@@ -436,7 +436,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
           transaction: transactionPayload,
           sendSender: shouldSendSender,
           sendReceiver: shouldSendReceiver,
-          mailjetSenderEmail
+          gmailSenderEmail
         }),
       });
 
@@ -525,7 +525,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
           transaction: updatedTxPayload, // Stateless payload for robust operations
           sendSender,
           sendReceiver,
-          mailjetSenderEmail
+          gmailSenderEmail
         })
       });
 
@@ -549,7 +549,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
       setCreatedTx(returnedTx);
     } catch (err: any) {
       console.error(err);
-      const errMsg = err.message || "Failed to dispatch emails. Please check your Mailjet API configuration.";
+      const errMsg = err.message || "Failed to dispatch emails. Please check your Gmail SMTP configuration.";
       setSendNowResult({
         type: "error",
         text: errMsg
@@ -660,23 +660,23 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
                 📧 Manual Email Dispatch Controls
               </h4>
 
-              {/* Verified Mailjet Sender Email info & input on success screen too */}
+              {/* Gmail Sender Email info & input on success screen too */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-left">
                 <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                  Verified Mailjet Sender Email
+                  Gmail Sender Email (From / Alias)
                 </label>
                 <input
                   type="email"
-                  value={mailjetSenderEmail}
+                  value={gmailSenderEmail}
                   onChange={(e) => {
-                    setMailjetSenderEmail(e.target.value);
-                    localStorage.setItem("mailjet_sender_email", e.target.value);
+                    setGmailSenderEmail(e.target.value);
+                    localStorage.setItem("gmail_sender_email", e.target.value);
                   }}
                   className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-800 bg-white outline-none"
-                  placeholder="sender@verifieddomain.com"
+                  placeholder="user@gmail.com"
                 />
                 <p className="text-[9px] text-slate-400 leading-normal font-medium">
-                  Verify this is a registered sender in your Mailjet account dashboard.
+                  Ideally same as GMAIL_USER or a configured Google Send Mail As alias.
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5">
@@ -1622,24 +1622,24 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
                 </div>
               </div>
               
-              {/* Custom Mailjet Sender Email input */}
+              {/* Custom Gmail Sender Email input */}
               <div className="space-y-1.5 bg-white p-3 border border-slate-200 rounded-xl">
                 <label className="block text-[9px] font-bold text-slate-700 uppercase tracking-wider">
-                  Verified Mailjet Sender Email
+                  Gmail Sender Email (From / Alias)
                 </label>
                 <input
                   type="email"
                   required
-                  placeholder="e.g. sender@verifieddomain.com"
-                  value={mailjetSenderEmail}
+                  placeholder="e.g. user@gmail.com"
+                  value={gmailSenderEmail}
                   onChange={(e) => {
-                    setMailjetSenderEmail(e.target.value);
-                    localStorage.setItem("mailjet_sender_email", e.target.value);
+                    setGmailSenderEmail(e.target.value);
+                    localStorage.setItem("gmail_sender_email", e.target.value);
                   }}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none"
                 />
                 <p className="text-[9px] text-slate-400 font-medium leading-normal">
-                  ⚠️ <strong>Important:</strong> Mailjet requires this email to be a <strong>verified sender</strong> in your Mailjet account dashboard. If you use a non-verified email, Mailjet will refuse to dispatch.
+                  ⚠️ <strong>Important:</strong> Google SMTP expects this email to match your authenticated Gmail account or a configured <strong>Send Mail As</strong> alias.
                 </p>
               </div>
 
