@@ -359,7 +359,8 @@ export default function App() {
     setAdminLoading(true);
     try {
       const response = await fetch("/api/users", {
-        headers: { "admin-email": accountUser.email }
+        headers: { "admin-email": accountUser.email },
+        cache: "no-cache"
       });
       const data = await response.json();
       if (response.ok) {

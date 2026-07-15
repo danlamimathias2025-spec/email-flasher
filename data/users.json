@@ -1,0 +1,25 @@
+[
+  {
+    "id": "admin-1",
+    "email": "mathiasdanlami2025@gmail.com",
+    "password": "AdminPassword2026",
+    "role": "admin",
+    "subscriptionStatus": "approved",
+    "accessCode": "386737",
+    "receiptImage": null,
+    "paymentSubmittedAt": null,
+    "approvedAt": null
+  },
+  {
+    "id": "u_qa2q1fqzq",
+    "email": "test@example.com",
+    "password": "password123",
+    "role": "user",
+    "subscriptionStatus": "none",
+    "subscriptionPlan": null,
+    "accessCode": null,
+    "receiptImage": null,
+    "paymentSubmittedAt": null,
+    "approvedAt": null
+  }
+]
