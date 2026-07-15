@@ -711,7 +711,8 @@ app.post(["/api/resend-email", "/resend-email"], async (req: Request, res: Respo
 // Configure Vite integration for SPA fallback
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
+    const vitePkg = "vite";
+    const { createServer: createViteServer } = await import(vitePkg);
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -729,6 +730,16 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
+
+// Global Error Handler
+app.use((err: any, req: Request, res: Response, next: any) => {
+  console.error("Unhandled server exception caught:", err);
+  res.status(500).json({
+    error: "Internal Server Error",
+    message: err.message || String(err),
+    stack: process.env.NODE_ENV !== "production" ? err.stack : undefined
+  });
+});
 
 if (!process.env.VERCEL) {
   startServer();
