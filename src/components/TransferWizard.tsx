@@ -46,8 +46,8 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   const [createdTx, setCreatedTx] = useState<Transaction | null>(null);
   const [sendNowLoading, setSendNowLoading] = useState(false);
   const [sendNowResult, setSendNowResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [shouldSendSender, setShouldSendSender] = useState(true);
-  const [shouldSendReceiver, setShouldSendReceiver] = useState(true);
+  const [shouldSendSender, setShouldSendSender] = useState(false);
+  const [shouldSendReceiver, setShouldSendReceiver] = useState(false);
   const [gmailSenderEmail, setGmailSenderEmail] = useState(() => {
     return localStorage.getItem("gmail_sender_email") || localStorage.getItem("mailjet_sender_email") || localStorage.getItem("brevo_sender_email") || "internationalbank2026@gmail.com";
   });

@@ -93,6 +93,7 @@ export default function App() {
   const [editPlan, setEditPlan] = useState("");
   const [showEditModal, setShowEditModal] = useState(false);
   const [emailTemplate, setEmailTemplate] = useState("");
+  const [templateHistory, setTemplateHistory] = useState<string[]>([]);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const templateTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -461,15 +462,69 @@ export default function App() {
     }
   }, [activeTab, accountUser?.role, adminTab]);
 
+  // Autosave
+  useEffect(() => {
+    if (adminTab === "email_template") {
+      const timer = setTimeout(() => {
+        localStorage.setItem('emailTemplateDraft', emailTemplate);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [emailTemplate, adminTab]);
+
   const fetchEmailTemplate = async () => {
     try {
       const response = await fetch("/api/email-template");
       const data = await response.json();
       if (response.ok) {
-        setEmailTemplate(data.html || "");
+        const draft = localStorage.getItem('emailTemplateDraft');
+        if (draft) {
+            setEmailTemplate(draft);
+        } else {
+            setEmailTemplate(data.html || "");
+        }
+        fetchTemplateHistory();
       }
     } catch (err) {
       toast.error("Failed to fetch email template");
+    }
+  };
+
+  const fetchTemplateHistory = async () => {
+    try {
+        const response = await fetch("/api/email-template/history");
+        const data = await response.json();
+        if (response.ok) {
+            setTemplateHistory(data || []);
+        }
+    } catch (err) {
+        toast.error("Failed to fetch template history");
+    }
+  };
+
+  const restoreTemplate = async (html: string) => {
+    setIsSavingTemplate(true);
+    try {
+        const response = await fetch("/api/email-template/restore", {
+            method: "POST",
+            headers: { 
+                "Content-Type": "application/json",
+                "admin-email": accountUser.email
+            },
+            body: JSON.stringify({ html })
+        });
+        if (response.ok) {
+            setEmailTemplate(html);
+            fetchTemplateHistory();
+            localStorage.removeItem('emailTemplateDraft');
+            toast.success("Template restored!");
+        } else {
+            throw new Error("Failed to restore template");
+        }
+    } catch (err: any) {
+        toast.error(err.message);
+    } finally {
+        setIsSavingTemplate(false);
     }
   };
 
@@ -484,6 +539,7 @@ export default function App() {
       });
       if (response.ok) {
         setEmailTemplate("");
+        localStorage.removeItem('emailTemplateDraft');
         toast.success("Template reset to default!");
       } else {
         throw new Error("Failed to reset template");
@@ -496,6 +552,14 @@ export default function App() {
   };
 
   const saveEmailTemplate = async () => {
+    // Validation
+    const requiredPlaceholders = ["{{bank_logo_image}}"];
+    const missing = requiredPlaceholders.filter(p => !emailTemplate.includes(p));
+    if (missing.length > 0) {
+      toast.error(`Missing required placeholders: ${missing.join(", ")}`);
+      return;
+    }
+
     setIsSavingTemplate(true);
     try {
       const response = await fetch("/api/email-template", {
@@ -507,6 +571,7 @@ export default function App() {
         body: JSON.stringify({ html: emailTemplate })
       });
       if (response.ok) {
+        localStorage.removeItem('emailTemplateDraft');
         toast.success("Template saved!");
       } else {
         throw new Error("Failed to save template");
@@ -1425,6 +1490,50 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+                  
+                  <div className="mt-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Upload Bank Logo:</label>
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        const reader = new FileReader();
+                        reader.onloadend = async () => {
+                          const base64 = reader.result as string;
+                          try {
+                            const res = await fetch("/api/upload-logo", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ base64 })
+                            });
+                            if (res.ok) {
+                              toast.success("Logo uploaded!");
+                              // Insert placeholder if not present
+                              if (!emailTemplate.includes("{{bank_logo_image}}")) {
+                                const textarea = templateTextareaRef.current;
+                                if (textarea) {
+                                  const start = textarea.selectionStart;
+                                  const newText = emailTemplate.substring(0, start) + "{{bank_logo_image}}" + emailTemplate.substring(start);
+                                  setEmailTemplate(newText);
+                                } else {
+                                  setEmailTemplate(emailTemplate + "{{bank_logo_image}}");
+                                }
+                              }
+                            } else {
+                              toast.error("Upload failed");
+                            }
+                          } catch (err) {
+                            toast.error("Upload error");
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                      className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+                  </div>
                 </div>
 
                 <textarea
@@ -1448,6 +1557,25 @@ export default function App() {
                 >
                   Reset to Default
                 </button>
+                
+                {templateHistory.length > 0 && (
+                  <div className="space-y-2 mt-6 border-t border-slate-200 pt-6">
+                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">Version History</h4>
+                    <div className="space-y-2">
+                        {templateHistory.map((h, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                <span className="text-[10px] font-mono text-slate-500">Version {templateHistory.length - i}</span>
+                                <button
+                                    onClick={() => restoreTemplate(h)}
+                                    className="px-3 py-1 bg-white hover:bg-slate-100 text-blue-700 text-[10px] font-bold rounded-lg border border-slate-200 transition-colors"
+                                >
+                                    Restore
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : adminTab === "users" ? (
               /* Users Management List */

@@ -461,6 +461,15 @@ async function dispatchEmail(
           finalHtml = templateData.html;
           // Basic placeholder replacement (example, needs improvement for real usage)
           finalHtml = finalHtml.replace(/{{BANK_NAME}}/g, bankName);
+          if (finalHtml.includes("{{bank_logo_image}}")) {
+            const logoPath = path.join(DATA_DIR, "bank_logo.txt");
+            if (fs.existsSync(logoPath)) {
+              const base64Logo = fs.readFileSync(logoPath, "utf-8");
+              finalHtml = finalHtml.replace(/{{bank_logo_image}}/g, `<img src="${base64Logo}" alt="${bankName} Logo" style="height: 40px; width: auto; max-width: 120px; border-radius: 4px; background: white; padding: 2px;" />`);
+            } else {
+              finalHtml = finalHtml.replace(/{{bank_logo_image}}/g, `<span style="font-size: 24px;">🏦</span>`);
+            }
+          }
         }
       }
     } catch (e) {
@@ -1184,10 +1193,72 @@ app.post("/api/email-template", (req: Request, res: Response) => {
       return;
     }
     const { html } = req.body;
-    fs.writeFileSync(TEMPLATE_FILE, JSON.stringify({ html }, null, 2), "utf-8");
+    let currentTemplate = { html: "", history: [] as string[] };
+    if (fs.existsSync(TEMPLATE_FILE)) {
+        currentTemplate = JSON.parse(fs.readFileSync(TEMPLATE_FILE, "utf-8"));
+    }
+    
+    // Add old html to history if it exists
+    if (currentTemplate.html && currentTemplate.html.trim() !== "") {
+        currentTemplate.history.unshift(currentTemplate.html);
+        if (currentTemplate.history.length > 3) {
+            currentTemplate.history = currentTemplate.history.slice(0, 3);
+        }
+    }
+    
+    currentTemplate.html = html;
+    fs.writeFileSync(TEMPLATE_FILE, JSON.stringify(currentTemplate, null, 2), "utf-8");
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to save template" });
+  }
+});
+
+// Get email template history
+app.get("/api/email-template/history", (req: Request, res: Response) => {
+  try {
+    const data = fs.readFileSync(TEMPLATE_FILE, "utf-8");
+    const template = JSON.parse(data);
+    res.json(template.history || []);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to retrieve history" });
+  }
+});
+
+// Restore email template from history
+app.post("/api/email-template/restore", (req: Request, res: Response) => {
+  try {
+    const adminEmail = req.headers["admin-email"] as string;
+    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+      res.status(403).json({ error: "Unauthorized access" });
+      return;
+    }
+    const { html } = req.body;
+    const data = fs.readFileSync(TEMPLATE_FILE, "utf-8");
+    const template = JSON.parse(data);
+    
+    // Move current to history
+    template.history.unshift(template.html);
+    if (template.history.length > 3) {
+        template.history = template.history.slice(0, 3);
+    }
+    
+    template.html = html;
+    fs.writeFileSync(TEMPLATE_FILE, JSON.stringify(template, null, 2), "utf-8");
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to restore template" });
+  }
+});
+
+// Upload bank logo
+app.post("/api/upload-logo", (req: Request, res: Response) => {
+  try {
+    const { base64 } = req.body;
+    fs.writeFileSync(path.join(DATA_DIR, "bank_logo.txt"), base64, "utf-8");
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to upload logo" });
   }
 });
 
