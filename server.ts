@@ -793,7 +793,6 @@ function getUsers(): any[] {
     }
     const data = fs.readFileSync(USERS_FILE, "utf-8");
     const users = JSON.parse(data);
-    console.log("Users file loaded, count:", users.length);
     let modified = false;
     for (const u of users) {
       if (checkAndExpireUser(u)) {

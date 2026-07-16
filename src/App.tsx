@@ -359,11 +359,9 @@ export default function App() {
     setAdminLoading(true);
     try {
       const response = await fetch("/api/users", {
-        headers: { "admin-email": accountUser.email },
-        cache: "no-cache"
+        headers: { "admin-email": accountUser.email }
       });
       const data = await response.json();
-      console.log("Admin users fetched:", data);
       if (response.ok) {
         setAdminUsers(data);
       } else {
@@ -1343,7 +1341,6 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {console.log("Admin Users in Render:", adminUsers)}
                       {adminUsers.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="px-6 py-12 text-center text-xs text-slate-400 font-medium uppercase">
@@ -1429,11 +1426,7 @@ export default function App() {
                       </div>
 
                       {user.receiptImage && (
-                        <div 
-                          className="border border-slate-150 rounded-2xl overflow-hidden bg-slate-50 flex items-center justify-center max-h-56 p-2 cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => window.open(user.receiptImage, "_blank")}
-                          title="Click to view full image"
-                        >
+                        <div className="border border-slate-150 rounded-2xl overflow-hidden bg-slate-50 flex items-center justify-center max-h-56 p-2">
                           <img src={user.receiptImage} alt="Uploaded receipt" className="max-h-48 object-contain" />
                         </div>
                       )}
