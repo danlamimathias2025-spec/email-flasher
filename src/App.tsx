@@ -63,7 +63,7 @@ interface AccessSession {
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [isLocalMode, setIsLocalMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<"home" | "history" | "email" | "profile" | "admin">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "history" | "profile" | "admin">("home");
 
   // Account Authentication State
   const [accountUser, setAccountUser] = useState<any>(() => {
@@ -1193,69 +1193,6 @@ export default function App() {
               />
             )}
           </div>
-        ) : activeTab === "email" ? (
-          /* Device SMTP Configuration View */
-          <div className="space-y-6 flex-1 flex flex-col justify-start max-w-md mx-auto w-full animate-fade-in">
-            <div className="text-left mb-1 px-1">
-              <h2 className="text-lg font-black tracking-tight text-slate-900 uppercase">Device SMTP Configuration</h2>
-              <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black mt-0.5">Device Mail Client Access Information</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-              <div className="p-4 bg-blue-50 border border-blue-150 rounded-xl space-y-1.5 text-left">
-                <h3 className="font-black text-xs text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <Mail className="h-4 w-4 text-blue-500" />
-                  SMTP Mail Integration
-                </h3>
-                <p className="text-[11px] text-slate-600 leading-relaxed font-semibold">
-                  This system utilizes secure Gmail SMTP. To ensure flawless automatic receiver-side alert deliveries, you must have this account configured on your active device mail client.
-                </p>
-              </div>
-
-              {/* Email Credentials UI */}
-              <div className="space-y-4">
-                <div className="space-y-1 text-left">
-                  <span className="block text-[8px] font-black text-slate-500 uppercase tracking-wider">SMTP Account Email</span>
-                  <div className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl">
-                    <code className="text-xs font-mono text-slate-800 select-all truncate">internationalbank2026@gmail.com</code>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard("internationalbank2026@gmail.com", true)}
-                      className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer shrink-0"
-                      title="Copy email address"
-                    >
-                      {copiedEmail ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1 text-left">
-                  <span className="block text-[8px] font-black text-slate-500 uppercase tracking-wider">Device SMTP App Password</span>
-                  <div className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl">
-                    <code className="text-xs font-mono text-slate-800 select-all font-bold">Bank2026@</code>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard("Bank2026@", false)}
-                      className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer shrink-0"
-                      title="Copy App password"
-                    >
-                      {copiedPass ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-100 pt-4 space-y-3">
-                <h4 className="text-[9px] font-black text-slate-800 uppercase tracking-wider text-left">Setup Steps:</h4>
-                <ol className="text-[11px] text-slate-500 space-y-2 text-left list-decimal pl-4 leading-relaxed font-semibold">
-                  <li>Navigate to Settings &rarr; Accounts &rarr; Add Account on your active smartphone or computer.</li>
-                  <li>Choose <strong className="text-slate-700">Google / Gmail</strong> as the provider type.</li>
-                  <li>Authenticate with the system email and application password listed above.</li>
-                  <li>Enable Mail Sync to ensure your device successfully registers authorization handshakes.</li>
-                </ol>
-              </div>
-            </div>
-          </div>
         ) : activeTab === "profile" ? (
           <div className="space-y-6 flex-1 flex flex-col justify-start max-w-md mx-auto w-full animate-fade-in">
             <div className="text-left mb-1 px-1">
@@ -1733,27 +1670,6 @@ export default function App() {
                   />
                 )}
               </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("email")}
-                className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition-all duration-300 relative cursor-pointer ${
-                  activeTab === "email" 
-                    ? "text-blue-600 font-extrabold scale-105" 
-                    : "text-slate-400 hover:text-slate-600 font-bold hover:scale-102"
-                }`}
-              >
-                <Mail className="h-5 w-5 stroke-[2]" />
-                <span className="text-[9px] uppercase tracking-wider font-sans">Device Email</span>
-                {activeTab === "email" && (
-                  <motion.div 
-                    layoutId="activeTabIndicator" 
-                    className="absolute -bottom-1 w-5 h-0.75 bg-blue-600 rounded-full"
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-              </button>
-
               <button
                 type="button"
                 onClick={() => {
