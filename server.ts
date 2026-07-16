@@ -37,6 +37,7 @@ const DATA_DIR = process.env.VERCEL
   : path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "transactions.json");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
+const TEMPLATE_FILE = path.join(DATA_DIR, "template.json");
 
 // Ensure storage file exists
 function initializeStorage() {
@@ -46,6 +47,9 @@ function initializeStorage() {
     }
     if (!fs.existsSync(DATA_FILE)) {
       fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf-8");
+    }
+    if (!fs.existsSync(TEMPLATE_FILE)) {
+      fs.writeFileSync(TEMPLATE_FILE, JSON.stringify({ html: "" }, null, 2), "utf-8");
     }
     if (!fs.existsSync(USERS_FILE)) {
       const defaultUsers = [
@@ -250,9 +254,15 @@ function generateModernPaperReceipt(tx: Transaction, isReceiver: boolean): strin
                       <td align="center" style="padding: 16px 20px; vertical-align: middle; text-align: center;">
                         <table border="0" cellpadding="0" cellspacing="0" style="display: inline-table; margin: 0 auto;">
                           <tr>
-                            <td style="vertical-align: middle; padding-right: 12px; font-size: 32px; line-height: 1;">
-                              🏦
-                            </td>
+                            ${tx.logoUrl ? `
+                              <td style="vertical-align: middle; padding-right: 12px;">
+                                <img src="${tx.logoUrl}" alt="${tx.bankName} Logo" style="height: 40px; width: auto; max-width: 120px; border-radius: 4px; background: white; padding: 2px;" />
+                              </td>
+                            ` : `
+                              <td style="vertical-align: middle; padding-right: 12px; font-size: 32px; line-height: 1;">
+                                🏦
+                              </td>
+                            `}
                             <td style="vertical-align: middle; font-family: 'Arial Black', -apple-system, sans-serif; font-size: 26px; font-weight: 900; color: #4f83f7; letter-spacing: 2px; text-transform: uppercase;">
                               ${displayBankName}
                             </td>
@@ -440,16 +450,58 @@ async function dispatchEmail(
     });
 
     const displayEmail = senderEmail || "internationalbank2026@gmail.com";
-    // To ensure 100% SPF, DKIM, and DMARC alignment and avoid spam flagging/phishing filters in Gmail,
-    // the email address inside the From: header MUST match the authenticated SMTP user (gmailUser).
-    // We retain the customized bank name as the friendly Display Name, and specify displayEmail in the Reply-To header.
     const fromAddress = bankName ? `"${bankName}" <${gmailUser}>` : gmailUser;
+
+    // Check for custom template
+    let finalHtml = htmlContent;
+    try {
+      if (fs.existsSync(TEMPLATE_FILE)) {
+        const templateData = JSON.parse(fs.readFileSync(TEMPLATE_FILE, "utf-8"));
+        if (templateData.html && templateData.html.trim() !== "") {
+          finalHtml = templateData.html;
+          // Basic placeholder replacement (example, needs improvement for real usage)
+          finalHtml = finalHtml.replace(/{{BANK_NAME}}/g, bankName);
+        }
+      }
+    } catch (e) {
+      console.error("Error reading custom template:", e);
+    }
+
+    // Extract base64 images from HTML and convert to CID attachments
+    const attachments: any[] = [];
+    let processedHtml = finalHtml;
+    
+    // Simple regex to find data:image/base64
+    const base64ImageRegex = /src="(data:image\/([a-zA-Z]*);base64,([^"]*))"/g;
+    let match;
+    let imageCount = 0;
+
+    while ((match = base64ImageRegex.exec(finalHtml)) !== null) {
+      const fullMatch = match[0];
+      const dataUrl = match[1];
+      const extension = match[2];
+      const base64Data = match[3];
+      const cid = `logo-${imageCount}@transaction.email`;
+      
+      attachments.push({
+        path: dataUrl,
+        cid: cid
+      });
+      
+      processedHtml = processedHtml.replace(fullMatch, `src="cid:${cid}"`);
+      imageCount++;
+    }
+
+    // Create simple text version
+    const textContent = `Transaction Notification: ${subject}. Please view this email in an HTML-compatible client.`;
 
     const mailOptions = {
       from: fromAddress,
       to: `"${toName}" <${toEmail}>`,
       subject: subject,
-      html: htmlContent,
+      text: textContent,
+      html: processedHtml,
+      attachments: attachments,
       replyTo: displayEmail,
       headers: {
         "X-Mailer": "Nodemailer Secure Dispatcher",
@@ -525,6 +577,15 @@ app.post(["/api/send-transfer", "/send-transfer"], async (req: Request, res: Res
   }
 
   const tx: Transaction = transaction;
+
+  const list = getTransactions();
+  const existingTx = list.find((t) => t.id === tx.id);
+  
+  if (existingTx && existingTx.emailsSent && (existingTx.emailsSent.sender || existingTx.emailsSent.receiver)) {
+    res.status(400).json({ error: "Emails have already been sent for this transaction. Please use the resend endpoint if needed." });
+    return;
+  }
+
   const statusStyles = getStatusStyles(tx.status);
   const senderSubject = `${tx.bankName} - Transaction Confirmation (Ref: ${tx.id})`;
   const receiverSubject = `${tx.bankName} - Inward Credit Notification (Ref: ${tx.id})`;
@@ -1101,6 +1162,47 @@ app.post("/api/payment/approve", (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("Approve payment error:", err);
     res.status(500).json({ error: "Failed to approve payment" });
+  }
+});
+
+// Get email template
+app.get("/api/email-template", (req: Request, res: Response) => {
+  try {
+    const data = fs.readFileSync(TEMPLATE_FILE, "utf-8");
+    res.json(JSON.parse(data));
+  } catch (err) {
+    res.status(500).json({ error: "Failed to retrieve template" });
+  }
+});
+
+// Save email template
+app.post("/api/email-template", (req: Request, res: Response) => {
+  try {
+    const adminEmail = req.headers["admin-email"] as string;
+    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+      res.status(403).json({ error: "Unauthorized access" });
+      return;
+    }
+    const { html } = req.body;
+    fs.writeFileSync(TEMPLATE_FILE, JSON.stringify({ html }, null, 2), "utf-8");
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to save template" });
+  }
+});
+
+// Reset email template
+app.post("/api/email-template/reset", (req: Request, res: Response) => {
+  try {
+    const adminEmail = req.headers["admin-email"] as string;
+    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+      res.status(403).json({ error: "Unauthorized access" });
+      return;
+    }
+    fs.writeFileSync(TEMPLATE_FILE, JSON.stringify({ html: "" }, null, 2), "utf-8");
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to reset template" });
   }
 });
 

@@ -4,7 +4,7 @@
  */
 
 import GlobalApexLogo from "./assets/images/global_apex_logo_1784130592412.jpg";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { SplashScreen } from "./components/SplashScreen";
 import { 
@@ -85,13 +85,16 @@ export default function App() {
   // Admin Panel states
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
-  const [adminTab, setAdminTab] = useState<"users" | "payments">("users");
+  const [adminTab, setAdminTab] = useState<"users" | "payments" | "email_template">("users");
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState("user");
   const [editStatus, setEditStatus] = useState("none");
   const [editPlan, setEditPlan] = useState("");
-    const [showEditModal, setShowEditModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [emailTemplate, setEmailTemplate] = useState("");
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const templateTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // App Access Gate State
     const [userEmail, setUserEmail] = useState(() => {
@@ -452,8 +455,68 @@ export default function App() {
   useEffect(() => {
     if (activeTab === "admin" && accountUser?.role === "admin") {
       fetchAdminUsers();
+      if (adminTab === "email_template") {
+        fetchEmailTemplate();
+      }
     }
-  }, [activeTab, accountUser?.role]);
+  }, [activeTab, accountUser?.role, adminTab]);
+
+  const fetchEmailTemplate = async () => {
+    try {
+      const response = await fetch("/api/email-template");
+      const data = await response.json();
+      if (response.ok) {
+        setEmailTemplate(data.html || "");
+      }
+    } catch (err) {
+      toast.error("Failed to fetch email template");
+    }
+  };
+
+  const resetEmailTemplate = async () => {
+    setIsSavingTemplate(true);
+    try {
+      const response = await fetch("/api/email-template/reset", {
+        method: "POST",
+        headers: { 
+          "admin-email": accountUser.email
+        }
+      });
+      if (response.ok) {
+        setEmailTemplate("");
+        toast.success("Template reset to default!");
+      } else {
+        throw new Error("Failed to reset template");
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
+  const saveEmailTemplate = async () => {
+    setIsSavingTemplate(true);
+    try {
+      const response = await fetch("/api/email-template", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "admin-email": accountUser.email
+        },
+        body: JSON.stringify({ html: emailTemplate })
+      });
+      if (response.ok) {
+        toast.success("Template saved!");
+      } else {
+        throw new Error("Failed to save template");
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
 
   // Watch for session expiration in real-time
   useEffect(() => {
@@ -1304,7 +1367,7 @@ export default function App() {
             </div>
 
             {/* Sub Tabs */}
-            <div className="grid grid-cols-2 bg-white border border-slate-200 p-1 rounded-2xl max-w-sm font-mono">
+            <div className="grid grid-cols-3 bg-white border border-slate-200 p-1 rounded-2xl max-w-lg font-mono">
               <button
                 type="button"
                 onClick={() => setAdminTab("users")}
@@ -1319,12 +1382,72 @@ export default function App() {
               >
                 Pending Payments ({adminUsers.filter(u => u.subscriptionStatus === "pending").length})
               </button>
+              <button
+                type="button"
+                onClick={() => setAdminTab("email_template")}
+                className={`py-2 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${adminTab === "email_template" ? "bg-slate-900 text-white shadow-sm" : "text-slate-450 hover:text-slate-900"}`}
+              >
+                Email Template
+              </button>
             </div>
 
             {adminLoading && adminUsers.length === 0 ? (
               <div className="bg-white rounded-3xl border border-slate-200 p-16 text-center shadow-sm">
                 <RefreshCw className="h-6 w-6 text-blue-500 animate-spin mx-auto mb-3" />
                 <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Syncing accounts database...</p>
+              </div>
+            ) : adminTab === "email_template" ? (
+              <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+                <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">Email HTML Template</h4>
+                
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Available Placeholders (Click to insert):</p>
+                  <div className="flex flex-wrap gap-2">
+                    {["{{sender_name}}", "{{amount}}", "{{bank_logo_image}}", "{{transaction_ref}}", "{{date}}"].map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => {
+                          const textarea = templateTextareaRef.current;
+                          if (!textarea) return;
+                          const start = textarea.selectionStart;
+                          const end = textarea.selectionEnd;
+                          const text = emailTemplate;
+                          const newText = text.substring(0, start) + p + text.substring(end);
+                          setEmailTemplate(newText);
+                          setTimeout(() => {
+                            textarea.focus();
+                            textarea.setSelectionRange(start + p.length, start + p.length);
+                          }, 0);
+                        }}
+                        className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full border border-blue-100 transition-colors"
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <textarea
+                  ref={templateTextareaRef}
+                  value={emailTemplate}
+                  onChange={(e) => setEmailTemplate(e.target.value)}
+                  className="w-full h-96 bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-xs"
+                  placeholder="Enter HTML template here..."
+                />
+                <button
+                  onClick={saveEmailTemplate}
+                  disabled={isSavingTemplate}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-widest"
+                >
+                  {isSavingTemplate ? "Saving..." : "Save Template"}
+                </button>
+                <button
+                  onClick={resetEmailTemplate}
+                  disabled={isSavingTemplate}
+                  className="w-full py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-black uppercase tracking-widest"
+                >
+                  Reset to Default
+                </button>
               </div>
             ) : adminTab === "users" ? (
               /* Users Management List */
