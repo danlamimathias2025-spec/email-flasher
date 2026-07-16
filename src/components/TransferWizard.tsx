@@ -85,7 +85,28 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
     "CRITICAL TRANSFER DIRECTIVE: Please complete biometric signature verification within 24 hours to secure immediate release."
   );
 
-  // Step 4: Email Preview State
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+  const [isFetchingRates, setIsFetchingRates] = useState(false);
+
+  React.useEffect(() => {
+    const fetchRates = async () => {
+      setIsFetchingRates(true);
+      try {
+        const response = await fetch(`/api/exchange-rates/${selectedCurrency.code}`);
+        const data = await response.json();
+        if (response.ok) {
+          setExchangeRates(data);
+        } else {
+          setExchangeRates(null);
+        }
+      } catch (err) {
+        setExchangeRates(null);
+      } finally {
+        setIsFetchingRates(false);
+      }
+    };
+    fetchRates();
+  }, [selectedCurrency.code]);
   const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState<{
@@ -903,7 +924,19 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
               Step 1: Transaction Setup
             </h3>
-            
+            {isFetchingRates ? (
+              <div className="text-[10px] font-bold text-slate-400 animate-pulse mb-4">Loading rates...</div>
+            ) : exchangeRates ? (
+              <div className="flex gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-bold text-slate-600 mb-4">
+                {["EUR", "GBP", "JPY"].map((c) => exchangeRates[c] ? (
+                  <div key={c} className="flex items-center gap-1">
+                    <span>1 {selectedCurrency.code} =</span>
+                    <span className="text-blue-600">{exchangeRates[c]?.toFixed(2)} {c}</span>
+                  </div>
+                ) : null)}
+              </div>
+            ) : null}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Bank Name */}
               <div className="space-y-1">

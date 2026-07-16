@@ -1277,6 +1277,26 @@ app.post("/api/email-template/reset", (req: Request, res: Response) => {
   }
 });
 
+// Get exchange rates for base
+app.get("/api/exchange-rates/:base", async (req: Request, res: Response) => {
+  try {
+    const { base } = req.params;
+    const apiKey = process.env.CURRENCY_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "API key not configured" });
+    }
+    const response = await fetch(`https://v6.exchangerate-api.com/v6/${apiKey}/latest/${base}`);
+    const data = await response.json();
+    if (data.result === "success") {
+      res.json(data.conversion_rates);
+    } else {
+      res.status(500).json({ error: "Failed to fetch rates" });
+    }
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch rates" });
+  }
+});
+
 // Configure Vite integration for SPA fallback
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
