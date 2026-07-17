@@ -7,6 +7,8 @@ import GlobalApexLogo from "./assets/images/global_apex_logo_1784130592412.jpg";
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { SplashScreen } from "./components/SplashScreen";
+import { CryptoReceiptGenerator } from "./components/CryptoReceiptGenerator";
+import { CryptoEmailTransfer } from "./components/CryptoEmailTransfer";
 import { 
   Building, 
   Lock, 
@@ -17,6 +19,7 @@ import {
   Home,
   LogOut,
   X,
+  Send,
   Mail,
   Calendar,
   AlertCircle,
@@ -45,7 +48,8 @@ import {
   Edit,
   Settings,
   Key,
-  Printer
+  Printer,
+  Building2 as BuildingIcon
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 import { Transaction, TransactionStatus } from "./types";
@@ -63,7 +67,7 @@ interface AccessSession {
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [isLocalMode, setIsLocalMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<"home" | "history" | "profile" | "admin" | "email">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "history" | "profile" | "admin" | "receipt-generator" | "crypto-transfer">("home");
 
   // Account Authentication State
   const [accountUser, setAccountUser] = useState<any>(() => {
@@ -705,7 +709,7 @@ export default function App() {
     setResendLoading(true);
     setResendStatus(null);
     try {
-      const senderEmailToUse = localStorage.getItem("mailjet_sender_email") || accountUser?.email || "danlamimathias2025@gmail.com";
+      const senderEmailToUse = "internationalbank2026@gmail.com";
       const result = await safeFetchJson<{ success: boolean; results?: { sender: boolean; receiver: boolean }; error?: string }>("/api/resend-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1350,126 +1354,10 @@ export default function App() {
               );
             })()}
           </div>
-        ) : activeTab === "email" ? (
-          <div className="space-y-6 flex-1 flex flex-col justify-start max-w-4xl mx-auto w-full animate-fade-in text-left">
-            <div className="text-left mb-1 px-1">
-              <h2 className="text-lg font-black tracking-tight text-slate-900 uppercase">Email Template Editor</h2>
-              <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black mt-0.5">Customize your outgoing transaction receipts</p>
-            </div>
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
-              <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">Email HTML Template</h4>
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Available Placeholders (Click to insert):</p>
-                <div className="flex flex-wrap gap-2">
-                  {["{{sender_name}}", "{{amount}}", "{{bank_logo_image}}", "{{transaction_ref}}", "{{date}}"].map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => {
-                        const textarea = templateTextareaRef.current;
-                        if (!textarea) return;
-                        const start = textarea.selectionStart;
-                        const end = textarea.selectionEnd;
-                        const text = emailTemplate;
-                        const newText = text.substring(0, start) + p + text.substring(end);
-                        setEmailTemplate(newText);
-                        setTimeout(() => {
-                          textarea.focus();
-                          textarea.setSelectionRange(start + p.length, start + p.length);
-                        }, 0);
-                      }}
-                      className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full border border-blue-100 transition-colors"
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-                
-                <div className="mt-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Upload Bank Logo:</label>
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      
-                      const reader = new FileReader();
-                      reader.onloadend = async () => {
-                        const base64 = reader.result as string;
-                        try {
-                          const res = await fetch("/api/upload-logo", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ base64 })
-                          });
-                          if (res.ok) {
-                            toast.success("Logo uploaded!");
-                            if (!emailTemplate.includes("{{bank_logo_image}}")) {
-                              const textarea = templateTextareaRef.current;
-                              if (textarea) {
-                                const start = textarea.selectionStart;
-                                const newText = emailTemplate.substring(0, start) + "{{bank_logo_image}}" + emailTemplate.substring(start);
-                                setEmailTemplate(newText);
-                              } else {
-                                setEmailTemplate(emailTemplate + "{{bank_logo_image}}");
-                              }
-                            }
-                          } else {
-                            toast.error("Upload failed");
-                          }
-                        } catch (err) {
-                          toast.error("Upload error");
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                    className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                </div>
-              </div>
-
-              <textarea
-                ref={templateTextareaRef}
-                value={emailTemplate}
-                onChange={(e) => setEmailTemplate(e.target.value)}
-                className="w-full h-96 bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-xs"
-                placeholder="Enter HTML template here..."
-              />
-              <button
-                onClick={saveEmailTemplate}
-                disabled={isSavingTemplate}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-widest"
-              >
-                {isSavingTemplate ? "Saving..." : "Save Template"}
-              </button>
-              <button
-                onClick={resetEmailTemplate}
-                disabled={isSavingTemplate}
-                className="w-full py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-black uppercase tracking-widest"
-              >
-                Reset to Default
-              </button>
-              
-              {templateHistory.length > 0 && (
-                <div className="space-y-2 mt-6 border-t border-slate-200 pt-6">
-                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">Version History</h4>
-                  <div className="space-y-2">
-                      {templateHistory.map((h, i) => (
-                          <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                              <span className="text-[10px] font-mono text-slate-500">Version {templateHistory.length - i}</span>
-                              <button
-                                  onClick={() => restoreTemplate(h)}
-                                  className="px-3 py-1 bg-white hover:bg-slate-100 text-blue-700 text-[10px] font-bold rounded-lg border border-slate-200 transition-colors"
-                              >
-                                  Restore
-                              </button>
-                          </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+        ) : activeTab === "receipt-generator" ? (
+          <CryptoReceiptGenerator />
+        ) : activeTab === "crypto-transfer" ? (
+          <CryptoEmailTransfer />
         ) : activeTab === "admin" && accountUser?.role === "admin" ? (
           /* Admin Panel View */
           <div className="space-y-6 flex-1 flex flex-col justify-start max-w-4xl mx-auto w-full animate-fade-in text-left">
@@ -1647,18 +1535,18 @@ export default function App() {
             transition={{ type: "spring", stiffness: 350, damping: 28 }}
             className="fixed bottom-5 inset-x-4 z-40 shrink-0"
           >
-            <div className="max-w-md mx-auto bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.1)] py-2 px-4 flex items-center justify-around">
+            <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.1)] h-16 px-6 flex items-center justify-around">
               <button
                 type="button"
                 onClick={() => setActiveTab("home")}
-                className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition-all duration-300 relative cursor-pointer ${
+                className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all duration-300 relative cursor-pointer ${
                   activeTab === "home" 
                     ? "text-blue-600 font-extrabold scale-105" 
                     : "text-slate-400 hover:text-slate-600 font-bold hover:scale-102"
                 }`}
               >
-                <Home className="h-5 w-5 stroke-[2]" />
-                <span className="text-[9px] uppercase tracking-wider font-sans">New Transfer</span>
+                <Home className="h-3 w-3 stroke-[2]" />
+                <span className="text-[8px] uppercase tracking-wider font-sans">New Transfer</span>
                 {activeTab === "home" && (
                   <motion.div 
                     layoutId="activeTabIndicator" 
@@ -1673,14 +1561,14 @@ export default function App() {
                   setActiveTab("history");
                   fetchTransactions();
                 }}
-                className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition-all duration-300 relative cursor-pointer ${
+                className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all duration-300 relative cursor-pointer ${
                   activeTab === "history" 
                     ? "text-blue-600 font-extrabold scale-105" 
                     : "text-slate-400 hover:text-slate-600 font-bold hover:scale-102"
                 }`}
               >
-                <FileText className="h-5 w-5 stroke-[2]" />
-                <span className="text-[9px] uppercase tracking-wider font-sans">Ledger History</span>
+                <FileText className="h-3 w-3 stroke-[2]" />
+                <span className="text-[8px] uppercase tracking-wider font-sans">Ledger History</span>
                 {activeTab === "history" && (
                   <motion.div 
                     layoutId="activeTabIndicator" 
@@ -1692,16 +1580,16 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setActiveTab("email")}
-                className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition-all duration-300 relative cursor-pointer ${
-                  activeTab === "email" 
+                onClick={() => setActiveTab("receipt-generator")}
+                className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all duration-300 relative cursor-pointer ${
+                  activeTab === "receipt-generator" 
                     ? "text-blue-600 font-extrabold scale-105" 
                     : "text-slate-400 hover:text-slate-600 font-bold hover:scale-102"
                 }`}
               >
-                <Mail className="h-5 w-5 stroke-[2]" />
-                <span className="text-[9px] uppercase tracking-wider font-sans">Emails</span>
-                {activeTab === "email" && (
+                <CreditCard className="h-3 w-3 stroke-[2]" />
+                <span className="text-[8px] uppercase tracking-wider font-sans">Receipt Gen</span>
+                {activeTab === "receipt-generator" && (
                   <motion.div 
                     layoutId="activeTabIndicator" 
                     className="absolute -bottom-1 w-5 h-0.75 bg-blue-600 rounded-full"
@@ -1709,17 +1597,38 @@ export default function App() {
                   />
                 )}
               </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("crypto-transfer")}
+                className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all duration-300 relative cursor-pointer ${
+                  activeTab === "crypto-transfer" 
+                    ? "text-blue-600 font-extrabold scale-105" 
+                    : "text-slate-400 hover:text-slate-600 font-bold hover:scale-102"
+                }`}
+              >
+                <Send className="h-3 w-3 stroke-[2]" />
+                <span className="text-[8px] uppercase tracking-wider font-sans">Crypto</span>
+                {activeTab === "crypto-transfer" && (
+                  <motion.div 
+                    layoutId="activeTabIndicator" 
+                    className="absolute -bottom-1 w-5 h-0.75 bg-blue-600 rounded-full"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+              </button>
+
               <button
                 type="button"
                 onClick={() => setActiveTab("profile")}
-                className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl transition-all duration-300 relative cursor-pointer ${
+                className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all duration-300 relative cursor-pointer ${
                   activeTab === "profile" 
                     ? "text-blue-600 font-extrabold scale-105" 
                     : "text-slate-400 hover:text-slate-600 font-bold hover:scale-102"
                 }`}
               >
-                <User className="h-5 w-5 stroke-[2]" />
-                <span className="text-[9px] uppercase tracking-wider font-sans">My Profile</span>
+                <User className="h-3 w-3 stroke-[2]" />
+                <span className="text-[8px] uppercase tracking-wider font-sans">My Profile</span>
                 {activeTab === "profile" && (
                   <motion.div 
                     layoutId="activeTabIndicator" 
