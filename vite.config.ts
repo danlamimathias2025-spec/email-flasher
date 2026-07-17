@@ -11,7 +11,6 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        injectRegister: 'script',
         workbox: {
           navigateFallbackDenylist: [/^\/api/],
         },
