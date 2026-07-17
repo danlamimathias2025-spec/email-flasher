@@ -1232,8 +1232,17 @@ export default function App() {
       </header>
 
       {/* Centered Workspace Container */}
-      <main className="flex-1 max-w-xl w-full mx-auto px-4 py-8 flex flex-col justify-center">
-        {activeTab === "home" ? (
+      <main className={`flex-1 w-full mx-auto px-4 py-8 flex flex-col justify-center transition-all duration-300 ${activeTab === "admin" && accountUser?.role === "admin" ? "max-w-4xl" : "max-w-xl"}`}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 12, filter: "blur(4px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -12, filter: "blur(4px)" }}
+            transition={{ duration: 0.22, ease: "easeInOut" }}
+            className="w-full flex-1 flex flex-col"
+          >
+            {activeTab === "home" ? (
           <TransferWizard onTransferSuccess={handleTransferSuccess} isLocalMode={isLocalMode} />
         ) : activeTab === "history" ? (
           <div className="space-y-4 flex-1 flex flex-col justify-start">
@@ -1586,6 +1595,8 @@ export default function App() {
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Access Restrained / Unknown Tab</p>
           </div>
         )}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Persistent Floating Bottom Dock */}
