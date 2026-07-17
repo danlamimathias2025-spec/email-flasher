@@ -11,7 +11,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.token.email == 'mathiasdanlami2025@gmail.com';
+      return isSignedIn() && (request.auth.token.email == 'mathiasdanlami2025@gmail.com' || request.auth.token.email == 'danlamimathias2025@gmail.com');
     }
 
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches("^[a-zA-Z0-9_\\-]+$"); }
@@ -44,7 +44,7 @@ service cloud.firestore {
       allow create: if isOwner(userId)
         && isValidUser(incoming())
         && incoming().email == request.auth.token.email
-        && incoming().role == (request.auth.token.email == 'mathiasdanlami2025@gmail.com' ? 'admin' : 'user')
+        && incoming().role == ((request.auth.token.email == 'mathiasdanlami2025@gmail.com' || request.auth.token.email == 'danlamimathias2025@gmail.com') ? 'admin' : 'user')
         && incoming().keys().size() <= 10;
 
       allow update: if (isOwner(userId) || isAdmin())

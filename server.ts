@@ -1000,11 +1000,17 @@ app.post(["/api/resend-email", "/resend-email"], async (req: Request, res: Respo
 });
 
 // --- User Management Helpers & APIs ---
+function isAdminEmail(email?: string): boolean {
+  if (!email) return false;
+  const e = email.trim().toLowerCase();
+  return e === "mathiasdanlami2025@gmail.com" || e === "danlamimathias2025@gmail.com";
+}
+
 function checkAndExpireUser(user: any): boolean {
   if (!user) return false;
   
-  // Give mathiasdanlami2025@gmail.com free access to the app without subscription as the admin
-  if (user.email && user.email.trim().toLowerCase() === "mathiasdanlami2025@gmail.com") {
+  // Give admin free access to the app without subscription
+  if (user.email && isAdminEmail(user.email)) {
     let changed = false;
     if (user.role !== "admin") {
       user.role = "admin";
@@ -1085,7 +1091,7 @@ app.post("/api/auth/register", (req: Request, res: Response) => {
       return;
     }
     
-    const isFirstAdmin = emailNorm === "mathiasdanlami2025@gmail.com";
+    const isFirstAdmin = isAdminEmail(emailNorm);
     
     const newUser = {
       id: "u_" + Math.random().toString(36).substring(2, 11),
@@ -1198,7 +1204,7 @@ app.post("/api/auth/status", (req: Request, res: Response) => {
 app.get("/api/users", (req: Request, res: Response) => {
   try {
     const adminEmail = req.headers["admin-email"] as string;
-    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+    if (!isAdminEmail(adminEmail)) {
       res.status(403).json({ error: "Unauthorized access: Administrator only" });
       return;
     }
@@ -1215,7 +1221,7 @@ app.get("/api/users", (req: Request, res: Response) => {
 app.post("/api/users/update", (req: Request, res: Response) => {
   try {
     const adminEmail = req.headers["admin-email"] as string;
-    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+    if (!isAdminEmail(adminEmail)) {
       res.status(403).json({ error: "Unauthorized access: Administrator only" });
       return;
     }
@@ -1258,7 +1264,7 @@ app.post("/api/users/update", (req: Request, res: Response) => {
 app.post("/api/users/delete", (req: Request, res: Response) => {
   try {
     const adminEmail = req.headers["admin-email"] as string;
-    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+    if (!isAdminEmail(adminEmail)) {
       res.status(403).json({ error: "Unauthorized access: Administrator only" });
       return;
     }
@@ -1321,7 +1327,7 @@ app.post("/api/payment/submit", (req: Request, res: Response) => {
 app.post("/api/payment/approve", (req: Request, res: Response) => {
   try {
     const adminEmail = req.headers["admin-email"] as string;
-    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+    if (!isAdminEmail(adminEmail)) {
       res.status(403).json({ error: "Unauthorized access: Administrator only" });
       return;
     }
@@ -1366,7 +1372,7 @@ app.get("/api/email-template", (req: Request, res: Response) => {
 app.post("/api/email-template", (req: Request, res: Response) => {
   try {
     const adminEmail = req.headers["admin-email"] as string;
-    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+    if (!isAdminEmail(adminEmail)) {
       res.status(403).json({ error: "Unauthorized access" });
       return;
     }
@@ -1407,7 +1413,7 @@ app.get("/api/email-template/history", (req: Request, res: Response) => {
 app.post("/api/email-template/restore", (req: Request, res: Response) => {
   try {
     const adminEmail = req.headers["admin-email"] as string;
-    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+    if (!isAdminEmail(adminEmail)) {
       res.status(403).json({ error: "Unauthorized access" });
       return;
     }
@@ -1444,7 +1450,7 @@ app.post("/api/upload-logo", (req: Request, res: Response) => {
 app.post("/api/email-template/reset", (req: Request, res: Response) => {
   try {
     const adminEmail = req.headers["admin-email"] as string;
-    if (!adminEmail || adminEmail.trim().toLowerCase() !== "mathiasdanlami2025@gmail.com") {
+    if (!isAdminEmail(adminEmail)) {
       res.status(403).json({ error: "Unauthorized access" });
       return;
     }

@@ -68,6 +68,12 @@ interface AccessSession {
 }
 
 export default function App() {
+  const isAdminEmail = (email?: string) => {
+    if (!email) return false;
+    const e = email.trim().toLowerCase();
+    return e === "mathiasdanlami2025@gmail.com" || e === "danlamimathias2025@gmail.com";
+  };
+
   const [showSplash, setShowSplash] = useState(true);
   const [isLocalMode, setIsLocalMode] = useState(false);
   const [activeTab, setActiveTab] = useState<"home" | "history" | "profile" | "admin" | "receipt-generator" | "crypto-transfer">("home");
@@ -149,7 +155,7 @@ export default function App() {
     if (!accountUser) return null;
 
     // Admin bypass: mathiasdanlami2025@gmail.com has free, lifetime access as admin without subscription
-    if (accountUser.email && accountUser.email.trim().toLowerCase() === "mathiasdanlami2025@gmail.com") {
+    if (accountUser.email && isAdminEmail(accountUser.email)) {
       return {
         session: { email: accountUser.email, activatedAt: Date.now() - 3600 * 1000, expiresAt: Date.now() + 365 * 24 * 3600 * 1000 },
         daysLeft: 999,
@@ -197,28 +203,34 @@ export default function App() {
 
   const sessionInfo = getSessionInfo();
   const isAuthorized = accountUser && (
-    accountUser.email.trim().toLowerCase() === "mathiasdanlami2025@gmail.com" ||
+    isAdminEmail(accountUser.email) ||
     (accountUser.subscriptionStatus === "approved" && sessionInfo && !sessionInfo.isExpired)
   );
 
   // --- Account Authentication Handlers ---
   
   useEffect(() => {
+    let unsubscribeDoc: (() => void) | null = null;
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (unsubscribeDoc) {
+        unsubscribeDoc();
+        unsubscribeDoc = null;
+      }
       if (user) {
         const userRef = doc(db, 'users', user.uid);
-        const unsubscribeDoc = onSnapshot(userRef, (docSnap) => {
+        unsubscribeDoc = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = { id: docSnap.id, ...docSnap.data() };
             setAccountUser(data);
             localStorage.setItem("account_user", JSON.stringify(data));
           } else {
             // Create user
+            const isEmailAdmin = isAdminEmail(user.email || undefined);
             const newUser = {
               email: user.email,
-              role: user.email === 'mathiasdanlami2025@gmail.com' ? 'admin' : 'user',
-              subscriptionStatus: user.email === 'mathiasdanlami2025@gmail.com' ? 'approved' : 'none',
-              subscriptionPlan: user.email === 'mathiasdanlami2025@gmail.com' ? '1-Month' : null
+              role: isEmailAdmin ? 'admin' : 'user',
+              subscriptionStatus: isEmailAdmin ? 'approved' : 'none',
+              subscriptionPlan: isEmailAdmin ? '1-Month' : null
             };
             setDoc(userRef, newUser).then(() => {
               const data = { id: user.uid, ...newUser };
@@ -227,13 +239,17 @@ export default function App() {
             });
           }
         });
-        return () => unsubscribeDoc();
       } else {
         setAccountUser(null);
         localStorage.removeItem("account_user");
       }
     });
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeDoc) {
+        unsubscribeDoc();
+      }
+    };
   }, []);
 
   const handleGoogleLogin = async () => {
@@ -319,7 +335,22 @@ export default function App() {
   // --- Administrator panel Operations ---
   
   const fetchAdminUsers = async () => {
-    // Replaced by onSnapshot below
+    setAdminLoading(true);
+    try {
+      const q = collection(db, "users");
+      const snapshot = await getDocs(q);
+      const usersList: any[] = [];
+      snapshot.forEach((doc) => {
+        usersList.push({ id: doc.id, ...doc.data() });
+      });
+      setAdminUsers(usersList);
+      toast.success("Accounts database synchronized!");
+    } catch (err: any) {
+      console.error("Error manual sync admin users:", err);
+      toast.error("Failed to sync accounts: " + err.message);
+    } finally {
+      setAdminLoading(false);
+    }
   };
 
   
@@ -364,14 +395,32 @@ export default function App() {
     }
   };
 
-  // Fetch users list when admin view is active
+  // Fetch users list and listen for real-time updates when admin view is active
   useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
     if (activeTab === "admin" && accountUser?.role === "admin") {
-      fetchAdminUsers();
+      setAdminLoading(true);
+      unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
+        const usersList: any[] = [];
+        snapshot.forEach((doc) => {
+          usersList.push({ id: doc.id, ...doc.data() });
+        });
+        setAdminUsers(usersList);
+        setAdminLoading(false);
+      }, (err: any) => {
+        console.error("Real-time admin users snapshot error:", err);
+        setAdminLoading(false);
+      });
+
       if (adminTab === "email_template") {
         fetchEmailTemplate();
       }
     }
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [activeTab, accountUser?.role, adminTab]);
 
   // Autosave
@@ -1321,7 +1370,10 @@ export default function App() {
                                 {user.subscriptionStatus || "none"}
                               </span>
                             </td>
-                                                        <td className="px-6 py-4 text-right">
+                            <td className="px-6 py-4 font-mono text-xs text-slate-450">
+                              ••••••
+                            </td>
+                            <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button
                                   type="button"
