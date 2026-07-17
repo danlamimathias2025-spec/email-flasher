@@ -52,7 +52,7 @@ import {
   Building2 as BuildingIcon
 } from "lucide-react";
 import { auth, db, googleProvider } from "./lib/firebase";
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot } from "firebase/firestore";
 import { Toaster, toast } from "react-hot-toast";
 import { Transaction, TransactionStatus } from "./types";
@@ -84,8 +84,9 @@ export default function App() {
     return stored ? JSON.parse(stored) : null;
   });
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
-  
-  
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authConfirmPassword, setAuthConfirmPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
@@ -251,6 +252,71 @@ export default function App() {
       }
     };
   }, []);
+
+  const handleEmailRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail.trim() || !authPassword.trim() || !authConfirmPassword.trim()) {
+      setAuthError("Please fill out all fields.");
+      return;
+    }
+    if (authPassword !== authConfirmPassword) {
+      setAuthError("Passwords do not match.");
+      return;
+    }
+    if (authPassword.length < 6) {
+      setAuthError("Password should be at least 6 characters.");
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError("");
+    try {
+      await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+      toast.success("Account registered successfully!");
+      setAuthEmail("");
+      setAuthPassword("");
+      setAuthConfirmPassword("");
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      let errMsg = err.message || "Failed to register account.";
+      if (err.code === "auth/email-already-in-use") {
+        errMsg = "This email is already in use by another account.";
+      } else if (err.code === "auth/invalid-email") {
+        errMsg = "Please enter a valid email address.";
+      } else if (err.code === "auth/weak-password") {
+        errMsg = "Password is too weak. Please use a stronger password.";
+      }
+      setAuthError(errMsg);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail.trim() || !authPassword.trim()) {
+      setAuthError("Please enter your email and password.");
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError("");
+    try {
+      await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+      toast.success("Signed in successfully!");
+      setAuthEmail("");
+      setAuthPassword("");
+    } catch (err: any) {
+      console.error("Login error:", err);
+      let errMsg = err.message || "Failed to sign in.";
+      if (err.code === "auth/wrong-password" || err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+        errMsg = "Invalid email or password credentials.";
+      } else if (err.code === "auth/invalid-email") {
+        errMsg = "Please enter a valid email address.";
+      }
+      setAuthError(errMsg);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     setIsAuthLoading(true);
@@ -757,7 +823,68 @@ export default function App() {
 
             {/* Auth Form */}
             
-            <div className="space-y-4 text-center mt-6">
+            <form onSubmit={authTab === "login" ? handleEmailLogin : handleEmailRegister} className="space-y-4">
+              <div className="space-y-1 text-left">
+                <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="operator@globalapex.net"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
+                />
+              </div>
+
+              <div className="space-y-1 text-left">
+                <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Password</label>
+                <input
+                  type="password"
+                  required
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
+                />
+              </div>
+
+              {authTab === "register" && (
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Confirm Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={authConfirmPassword}
+                    onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
+                  />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isAuthLoading}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md flex items-center justify-center gap-2"
+              >
+                {isAuthLoading ? (
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : authTab === "login" ? (
+                  "Sign In with Password"
+                ) : (
+                  "Create Operator Account"
+                )}
+              </button>
+            </form>
+
+            {/* Divider */}
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-slate-800/80"></div>
+              <span className="flex-shrink mx-4 text-[10px] font-mono text-slate-500 uppercase tracking-widest">or continue with</span>
+              <div className="flex-grow border-t border-slate-800/80"></div>
+            </div>
+
+            <div className="space-y-4 text-center">
               <button
                 type="button"
                 onClick={handleGoogleLogin}
