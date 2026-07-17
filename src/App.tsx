@@ -84,7 +84,7 @@ export default function App() {
   const [isSubscriptionDropdownOpen, setIsSubscriptionDropdownOpen] = useState(false);
   const [uploadedReceiptBase64, setUploadedReceiptBase64] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<"1-Month" | "6-Months" | "1-Year">("1-Month");
+  const [selectedPlan, setSelectedPlan] = useState<"2-Weeks" | "1-Month" | "6-Months" | "1-Year">("1-Month");
 
   // Admin Panel states
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
@@ -287,8 +287,12 @@ export default function App() {
         setAccountUser(data.user);
         
         }
-    } catch (err) {
-      console.error("Failed to refresh status:", err);
+    } catch (err: any) {
+      if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("NetworkError"))) {
+        console.log("App is offline or network error, skipping status refresh");
+      } else {
+        console.error("Failed to refresh status:", err);
+      }
     }
   };
 
@@ -921,7 +925,15 @@ export default function App() {
               </div>
 
               {/* Plan Selection */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlan("2-Weeks")}
+                  className={`p-4 rounded-2xl border text-left transition-all ${selectedPlan === "2-Weeks" ? "bg-blue-900/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.15)]" : "bg-slate-950 border-slate-800/80 hover:border-slate-700"}`}
+                >
+                  <p className={`text-xs font-black uppercase tracking-wider ${selectedPlan === "2-Weeks" ? "text-blue-400" : "text-slate-400"}`}>2 Weeks</p>
+                  <p className="text-[10px] text-slate-500 mt-1">Trial access</p>
+                </button>
                 <button
                   type="button"
                   onClick={() => setSelectedPlan("1-Month")}
@@ -953,6 +965,7 @@ export default function App() {
                 <div>
                   <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Pricing Plan</p>
                   <p className="text-xl font-black text-white font-mono uppercase tracking-wide">
+                    {selectedPlan === "2-Weeks" && "2 Weeks Plan"}
                     {selectedPlan === "1-Month" && "1 Month Plan"}
                     {selectedPlan === "6-Months" && "6 Months Plan"}
                     {selectedPlan === "1-Year" && "1 Year Plan"}
@@ -960,6 +973,7 @@ export default function App() {
                 </div>
                 <a
                   href={
+                    selectedPlan === "2-Weeks" ? "https://paystack.shop/pay/globalapex2weeks" :
                     selectedPlan === "1-Month" ? "https://paystack.shop/pay/globalapex1" :
                     selectedPlan === "6-Months" ? "https://paystack.shop/pay/globalapex6" :
                     "https://paystack.shop/pay/globalapex"
@@ -1734,6 +1748,7 @@ export default function App() {
                   className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-slate-850 rounded-xl px-3 py-2.5 text-xs focus:outline-none transition-all font-bold"
                 >
                   <option value="">No Plan</option>
+                  <option value="2-Weeks">2 Weeks</option>
                   <option value="1-Month">1 Month</option>
                   <option value="6-Months">6 Months</option>
                   <option value="1-Year">1 Year</option>

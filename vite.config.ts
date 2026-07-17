@@ -11,12 +11,22 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        workbox: {
+          navigateFallbackDenylist: [/^\/api/],
+        },
         manifest: {
           name: 'Crypto Receipt Generator',
           short_name: 'CryptoReceipt',
           description: 'Generate cryptocurrency transaction receipts.',
           theme_color: '#181e25',
-          icons: []
+          icons: [
+            {
+              src: 'icon.svg',
+              sizes: '192x192 512x512',
+              type: 'image/svg+xml',
+              purpose: 'any maskable'
+            }
+          ]
         }
       })
     ],
