@@ -7,7 +7,7 @@ import express, { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
-import { Transaction, TransactionStatus } from "./src/types";
+import { Transaction, TransactionStatus } from "./src/types.js";
 import nodemailer from "nodemailer";
 
 // Load environment variables
@@ -16,17 +16,15 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+app.get("/api/ping", (req, res) => res.json({ message: "pong", vercel: process.env.VERCEL }));
+
 // Enable JSON bodies with higher limits for base64 logos
 app.use(express.json({ limit: "50mb" }));
 
 // Normalize Vercel Serverless routing variations (ensure /api/... is matched properly)
 app.use((req, res, next) => {
-  if (req.url && !req.url.startsWith("/api/")) {
-    const knownEndpoints = ["/transactions", "/preview-email", "/send-transfer", "/resend-email"];
-    const pathName = req.url.split("?")[0];
-    if (knownEndpoints.includes(pathName)) {
-      req.url = "/api" + req.url;
-    }
+  if (process.env.VERCEL && req.url && !req.url.startsWith("/api/")) {
+    req.url = "/api" + (req.url.startsWith("/") ? req.url : "/" + req.url);
   }
   next();
 });
@@ -1508,6 +1506,11 @@ app.use((err: any, req: Request, res: Response, next: any) => {
     message: err.message || String(err),
     stack: process.env.NODE_ENV !== "production" ? err.stack : undefined
   });
+});
+
+// Global 404 Handler for API routes
+app.use("/api/*", (req: Request, res: Response) => {
+  res.status(404).json({ error: "Route not found in Express", url: req.url });
 });
 
 if (!process.env.VERCEL) {
