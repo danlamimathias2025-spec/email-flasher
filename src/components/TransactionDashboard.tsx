@@ -151,7 +151,7 @@ export default function TransactionDashboard({ transactions, onSelectTransaction
                   <div className="flex items-center gap-2.5 mt-2">
                     {renderStatusBadge(tx.status)}
                     <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider font-mono">
-                      {new Date(tx.date).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                      {new Date(tx.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                     </span>
                   </div>
                 </div>

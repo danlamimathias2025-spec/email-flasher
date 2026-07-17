@@ -314,7 +314,7 @@ const ReceiptDisplay = ({
 
           <div className="flex justify-between items-center">
             <span className="text-[#848e9c] font-semibold">Date</span>
-            <span className="text-white font-bold tracking-tight">{data.date}</span>
+            <span className="text-white font-bold tracking-tight">{data.date.replace('T', ' ')}</span>
           </div>
         </div>
 
@@ -359,7 +359,7 @@ export const CryptoReceiptGenerator = () => {
     txid: generateRandomTxid(),
     status: "Completed",
     fee: "1.5",
-    date: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    date: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
     type: 'deposit' as 'deposit' | 'withdrawal',
     platform: 'Binance'
   });
@@ -649,6 +649,18 @@ export const CryptoReceiptGenerator = () => {
           </div>
         </div>
 
+        {/* Transaction Date */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Transaction Date & Time</label>
+          <input 
+            type="datetime-local" 
+            value={data.date} 
+            onChange={e => setData({...data, date: e.target.value})} 
+            className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-800 text-sm"
+            required
+          />
+        </div>
+
         {/* Transaction Status Selection */}
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Transaction Status</label>
@@ -788,7 +800,7 @@ export const CryptoReceiptGenerator = () => {
                       To: {item.address}
                     </p>
                     <p className="text-[9px] text-slate-400">
-                      {item.date} • {item.network}
+                      {item.date.replace('T', ' ')} • {item.network}
                     </p>
                   </div>
                   

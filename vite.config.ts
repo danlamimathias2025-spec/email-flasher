@@ -11,6 +11,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        injectRegister: 'script',
         workbox: {
           navigateFallbackDenylist: [/^\/api/],
         },
@@ -19,9 +20,11 @@ export default defineConfig(() => {
           short_name: 'CryptoReceipt',
           description: 'Generate cryptocurrency transaction receipts.',
           theme_color: '#181e25',
+          start_url: '/',
+          scope: '/',
           icons: [
             {
-              src: 'icon.svg',
+              src: '/icon.svg',
               sizes: '192x192 512x512',
               type: 'image/svg+xml',
               purpose: 'any maskable'

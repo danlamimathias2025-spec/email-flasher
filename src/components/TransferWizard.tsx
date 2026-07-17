@@ -60,7 +60,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   const [amount, setAmount] = useState<number>(12500);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(ALL_CURRENCIES[0]); // default USD
   const [transactionDate, setTransactionDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
   );
   const [status, setStatus] = useState<TransactionStatus>("successful");
   const [description, setDescription] = useState("Corporate Invoice Payment");
@@ -1108,10 +1108,10 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
               {/* Transaction Date */}
               <div className="space-y-1">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                  Transaction Date *
+                  Transaction Date & Time *
                 </label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   required
                   value={transactionDate}
                   onChange={(e) => {
