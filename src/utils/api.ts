@@ -67,6 +67,16 @@ export async function safeFetchJson<T>(
         status,
       };
     }
+    
+    // Check if response is actually JSON before parsing
+    if (!contentType.includes("application/json")) {
+      return {
+        data: null,
+        error: `Server returned non-JSON response (Status ${status}): ${text.substring(0, 50)}...`,
+        isHtml: false,
+        status,
+      };
+    }
 
     try {
       const data = JSON.parse(text) as T;

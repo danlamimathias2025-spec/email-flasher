@@ -276,6 +276,11 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: accountUser.email }),
       });
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        console.error("Non-JSON response from /api/auth/status");
+        return;
+      }
       const data = await response.json();
       if (response.ok && data.user) {
         localStorage.setItem("account_user", JSON.stringify(data.user));
