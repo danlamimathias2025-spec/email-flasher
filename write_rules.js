@@ -1,0 +1,74 @@
+import { readFileSync, writeFileSync } from 'fs';
+
+const rules = `rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'mathiasdanlami2025@gmail.com';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role', 'subscriptionStatus']) 
+        && data.email is string 
+        && data.email.size() <= 100
+        && data.role is string
+        && data.role.size() <= 20
+        && data.subscriptionStatus is string
+        && data.subscriptionStatus.size() <= 20;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow create: if isOwner(userId)
+        && isValidUser(incoming())
+        && incoming().email == request.auth.token.email
+        && incoming().role == (request.auth.token.email == 'mathiasdanlami2025@gmail.com' ? 'admin' : 'user')
+        && incoming().keys().size() <= 10;
+
+      allow update: if (isOwner(userId) || isAdmin())
+        && isValidUser(incoming())
+        && incoming().email == existing().email
+        && (
+          isAdmin() || 
+          (
+            isOwner(userId) 
+            && incoming().diff(existing()).affectedKeys().hasOnly(['subscriptionPlan', 'receiptImage', 'subscriptionStatus', 'paymentSubmittedAt'])
+            && incoming().subscriptionStatus == 'pending'
+            && incoming().receiptImage is string
+            && incoming().receiptImage.size() <= 1048000
+            && incoming().subscriptionPlan is string
+            && incoming().subscriptionPlan.size() <= 50
+            && incoming().paymentSubmittedAt is string
+            && incoming().paymentSubmittedAt.size() <= 50
+          )
+        );
+
+      allow delete: if isAdmin();
+    }
+  }
+}
+`;
+
+writeFileSync('firestore.rules', rules);
