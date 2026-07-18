@@ -15,12 +15,12 @@ import { getAuth } from "firebase-admin/auth";
 // Load environment variables
 dotenv.config();
 
+import firebaseConfig from "./firebase-applet-config.json";
+
 // Initialize Firebase Admin SDK
 let adminApp: any = null;
 try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(configPath)) {
-    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  if (firebaseConfig && firebaseConfig.projectId) {
     adminApp = admin.initializeApp({
       projectId: firebaseConfig.projectId,
     });
