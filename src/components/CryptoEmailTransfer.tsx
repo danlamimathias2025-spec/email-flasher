@@ -53,25 +53,16 @@ export const CryptoEmailTransfer = () => {
         })
       });
 
-      let result: any = null;
-      try {
-        result = await response.json();
-      } catch (jsonErr) {
-        console.warn("Could not parse response JSON, falling back to local simulation:", jsonErr);
-      }
-
-      if (response.ok && result && result.success) {
+      const result = await response.json();
+      if (response.ok) {
         toast.success("Crypto Transfer Email sent successfully!");
         setSent(true);
       } else {
-        console.warn("Backend dispatch failed or returned error. Falling back to offline simulation.");
-        toast.success("Simulation: Dispatched Sender Copy & Beneficiary Copy!");
-        setSent(true);
+        toast.error(result.error || "Failed to send email");
       }
     } catch (error) {
-      console.warn("Network error sending Crypto email, falling back to simulation:", error);
-      toast.success("Simulation: Dispatched Sender Copy & Beneficiary Copy!");
-      setSent(true);
+      console.error("Error sending Crypto email:", error);
+      toast.error("An error occurred while sending the email");
     } finally {
       setLoading(false);
     }
