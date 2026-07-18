@@ -53,7 +53,7 @@ import {
 } from "lucide-react";
 import { auth, db, googleProvider } from "./lib/firebase";
 import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot, query, where } from "firebase/firestore";
 import { Toaster, toast } from "react-hot-toast";
 import { Transaction, TransactionStatus } from "./types";
 import TransferWizard from "./components/TransferWizard";
@@ -83,12 +83,18 @@ export default function App() {
     const stored = localStorage.getItem("account_user");
     return stored ? JSON.parse(stored) : null;
   });
-  const [authTab, setAuthTab] = useState<"login" | "register">("login");
+  const [authTab, setAuthTab] = useState<"login" | "register" | "reset">("login");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authConfirmPassword, setAuthConfirmPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+
+  // Profile Password Change states
+  const [profileOldPassword, setProfileOldPassword] = useState("");
+  const [profileNewPassword, setProfileNewPassword] = useState("");
+  const [profileConfirmNewPassword, setProfileConfirmNewPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Subscription Upload & Status
   const [isSubscriptionDropdownOpen, setIsSubscriptionDropdownOpen] = useState(false);
@@ -279,7 +285,7 @@ export default function App() {
       console.error("Registration error:", err);
       let errMsg = err.message || "Failed to register account.";
       if (err.code === "auth/email-already-in-use") {
-        errMsg = "This email is already in use by another account.";
+        errMsg = "This email is already registered.";
       } else if (err.code === "auth/invalid-email") {
         errMsg = "Please enter a valid email address.";
       } else if (err.code === "auth/weak-password") {
@@ -300,6 +306,23 @@ export default function App() {
     setIsAuthLoading(true);
     setAuthError("");
     try {
+      // 1. Check if user is registered via Google and doesn't have a password set,
+      // and if so, automatically synchronize/set this password to their Google account.
+      try {
+        const syncRes = await fetch("/api/auth/handle-google-password-sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: authEmail.trim(), password: authPassword })
+        });
+        const syncData = await syncRes.json();
+        if (syncRes.ok && syncData.success) {
+          console.log("Successfully synchronized/linked password to Google-registered account.");
+        }
+      } catch (syncErr) {
+        console.error("Silent catch during password sync:", syncErr);
+      }
+
+      // 2. Perform regular Firebase Auth sign in
       await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
       toast.success("Signed in successfully!");
       setAuthEmail("");
@@ -307,12 +330,54 @@ export default function App() {
     } catch (err: any) {
       console.error("Login error:", err);
       let errMsg = err.message || "Failed to sign in.";
-      if (err.code === "auth/wrong-password" || err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+      
+      // Determine if email exists in our database or auth to suggest registration
+      let existsInDb = false;
+      try {
+        const q = query(collection(db, "users"), where("email", "==", authEmail.trim().toLowerCase()));
+        const snap = await getDocs(q);
+        existsInDb = !snap.empty;
+      } catch (dbErr) {
+        console.error("Error querying user existence:", dbErr);
+      }
+
+      if (err.code === "auth/user-not-found" || (!existsInDb && (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password"))) {
+        errMsg = "This email is not registered with us.";
+      } else if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
         errMsg = "Invalid email or password credentials.";
       } else if (err.code === "auth/invalid-email") {
         errMsg = "Please enter a valid email address.";
       }
       setAuthError(errMsg);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handlePasswordResetRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail.trim()) {
+      setAuthError("Please enter your registered email address.");
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError("");
+    try {
+      const res = await fetch("/api/auth/reset-to-default", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to reset password.");
+      }
+      toast.success("Password reset to 12345! Default password sent via SMTP.");
+      setAuthTab("login");
+      setAuthPassword("12345"); // Fill it for ease of use
+    } catch (err: any) {
+      console.error("Password reset error:", err);
+      setAuthError(err.message || "Failed to reset password.");
     } finally {
       setIsAuthLoading(false);
     }
@@ -328,6 +393,47 @@ export default function App() {
       setAuthError(err.message || "Failed to sign in");
     } finally {
       setIsAuthLoading(false);
+    }
+  };
+
+  const handleProfilePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileOldPassword || !profileNewPassword || !profileConfirmNewPassword) {
+      toast.error("Please fill in all password fields.");
+      return;
+    }
+    if (profileNewPassword.length < 6) {
+      toast.error("New password must be at least 6 characters.");
+      return;
+    }
+    if (profileNewPassword !== profileConfirmNewPassword) {
+      toast.error("New passwords do not match.");
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: accountUser.email,
+          oldPassword: profileOldPassword,
+          newPassword: profileNewPassword
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update password.");
+      }
+      toast.success("Password changed successfully!");
+      setProfileOldPassword("");
+      setProfileNewPassword("");
+      setProfileConfirmNewPassword("");
+    } catch (err: any) {
+      console.error("Password change error:", err);
+      toast.error(err.message || "Failed to change password.");
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -437,12 +543,31 @@ export default function App() {
     e.preventDefault();
     if (!editingUser) return;
     try {
+      // If administrative password reset is requested, call our secure backend endpoint
+      if (editPassword.trim()) {
+        const resetRes = await fetch("/api/admin/reset-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            uid: editingUser.id,
+            email: editingUser.email,
+            newPassword: editPassword.trim()
+          })
+        });
+        const resetData = await resetRes.json();
+        if (!resetRes.ok) {
+          throw new Error(resetData.error || "Failed to reset user password.");
+        }
+        toast.success("User password updated successfully!");
+        setEditPassword("");
+      }
+
       await updateDoc(doc(db, "users", editingUser.id), {
         role: editRole,
         subscriptionStatus: editStatus,
         subscriptionPlan: editPlan
       });
-      toast.success("User updated successfully");
+      toast.success("User privilege/status updated successfully");
       setShowEditModal(false);
       setEditingUser(null);
     } catch (err: any) {
@@ -792,90 +917,162 @@ export default function App() {
                 GLOBAL PLATFORM ACCOUNT
               </h2>
               <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
-                {authTab === "login" ? "Sign In to Secure Account" : "Create Operator Account"}
+                {authTab === "login" ? "Sign In to Secure Account" : authTab === "register" ? "Create Operator Account" : "Recover Operator Account"}
               </p>
             </div>
 
             {/* Tabs */}
-            <div className="grid grid-cols-2 bg-slate-950 border border-slate-800/60 p-1 rounded-xl font-mono">
-              <button
-                type="button"
-                onClick={() => { setAuthTab("login"); setAuthError(""); }}
-                className={`py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${authTab === "login" ? "bg-slate-850 text-white shadow" : "text-slate-400 hover:text-white"}`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => { setAuthTab("register"); setAuthError(""); }}
-                className={`py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${authTab === "register" ? "bg-slate-850 text-white shadow" : "text-slate-400 hover:text-white"}`}
-              >
-                Register
-              </button>
-            </div>
-
-            {/* Error Message */}
-            {authError && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/25 text-rose-400 rounded-xl text-xs font-bold text-center">
-                {authError}
+            {authTab !== "reset" && (
+              <div className="grid grid-cols-2 bg-slate-950 border border-slate-800/60 p-1 rounded-xl font-mono">
+                <button
+                  type="button"
+                  onClick={() => { setAuthTab("login"); setAuthError(""); }}
+                  className={`py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${authTab === "login" ? "bg-slate-850 text-white shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthTab("register"); setAuthError(""); }}
+                  className={`py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${authTab === "register" ? "bg-slate-850 text-white shadow" : "text-slate-400 hover:text-white"}`}
+                >
+                  Register
+                </button>
               </div>
             )}
 
-            {/* Auth Form */}
-            
-            <form onSubmit={authTab === "login" ? handleEmailLogin : handleEmailRegister} className="space-y-4">
-              <div className="space-y-1 text-left">
-                <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={authEmail}
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                  placeholder="operator@globalapex.net"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
-                />
+            {/* Error Message with interactive prompts */}
+            {authError && (
+              <div className="p-4 bg-rose-500/10 border border-rose-500/25 text-rose-400 rounded-xl text-xs font-bold text-center space-y-2">
+                <p>{authError}</p>
+                {authError.includes("not registered") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthTab("register");
+                      setAuthError("");
+                    }}
+                    className="mt-1 text-blue-400 hover:text-blue-300 underline font-black uppercase tracking-wider block mx-auto cursor-pointer"
+                  >
+                    Click Here to Register Now
+                  </button>
+                )}
+                {authError.includes("already registered") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthTab("login");
+                      setAuthError("");
+                    }}
+                    className="mt-1 text-blue-400 hover:text-blue-300 underline font-black uppercase tracking-wider block mx-auto cursor-pointer"
+                  >
+                    Click Here to Login Instead
+                  </button>
+                )}
               </div>
+            )}
 
-              <div className="space-y-1 text-left">
-                <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Password</label>
-                <input
-                  type="password"
-                  required
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
-                />
-              </div>
-
-              {authTab === "register" && (
+            {/* Auth Form / Reset Form */}
+            {authTab === "reset" ? (
+              <form onSubmit={handlePasswordResetRequest} className="space-y-4">
                 <div className="space-y-1 text-left">
-                  <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Confirm Password</label>
+                  <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="operator@globalapex.net"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700 font-mono"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isAuthLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md flex items-center justify-center gap-2"
+                >
+                  {isAuthLoading ? (
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    "Reset Password to Default"
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setAuthTab("login"); setAuthError(""); }}
+                  className="w-full text-center text-xs font-bold text-slate-400 hover:text-white uppercase tracking-wider block pt-2 cursor-pointer transition-colors"
+                >
+                  ← Back to Sign In
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={authTab === "login" ? handleEmailLogin : handleEmailRegister} className="space-y-4">
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="operator@globalapex.net"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
+                  />
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Password</label>
+                    {authTab === "login" && (
+                      <button
+                        type="button"
+                        onClick={() => { setAuthTab("reset"); setAuthError(""); }}
+                        className="text-[9px] font-mono text-blue-400 hover:text-blue-300 uppercase tracking-wider cursor-pointer"
+                      >
+                        Forgot Password?
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="password"
                     required
-                    value={authConfirmPassword}
-                    onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
                     placeholder="••••••••"
                     className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
                   />
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={isAuthLoading}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md flex items-center justify-center gap-2"
-              >
-                {isAuthLoading ? (
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : authTab === "login" ? (
-                  "Sign In with Password"
-                ) : (
-                  "Create Operator Account"
+                {authTab === "register" && (
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Confirm Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={authConfirmPassword}
+                      onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
+                    />
+                  </div>
                 )}
-              </button>
-            </form>
+
+                <button
+                  type="submit"
+                  disabled={isAuthLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md flex items-center justify-center gap-2"
+                >
+                  {isAuthLoading ? (
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : authTab === "login" ? (
+                    "Sign In with Password"
+                  ) : (
+                    "Create Operator Account"
+                  )}
+                </button>
+              </form>
+            )}
 
             {/* Divider */}
             <div className="relative flex py-2 items-center">
@@ -1398,6 +1595,69 @@ export default function App() {
                       <MessageCircle className="h-4 w-4" />
                       Contact Secure Desk
                     </a>
+                  </div>
+
+                  {/* Change Password Card */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                    <div className="text-left space-y-1">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                        <Key className="h-4 w-4 text-slate-500" />
+                        Change Password
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">
+                        Update your authentication credentials below.
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleProfilePasswordChange} className="space-y-3">
+                      <div className="space-y-1 text-left">
+                        <label className="text-[9px] font-mono text-slate-500 uppercase tracking-wider block">Current Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={profileOldPassword}
+                          onChange={(e) => setProfileOldPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs px-3.5 py-2.5 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-300 font-mono"
+                        />
+                      </div>
+
+                      <div className="space-y-1 text-left">
+                        <label className="text-[9px] font-mono text-slate-500 uppercase tracking-wider block">New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={profileNewPassword}
+                          onChange={(e) => setProfileNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs px-3.5 py-2.5 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-300 font-mono"
+                        />
+                      </div>
+
+                      <div className="space-y-1 text-left">
+                        <label className="text-[9px] font-mono text-slate-500 uppercase tracking-wider block">Confirm New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={profileConfirmNewPassword}
+                          onChange={(e) => setProfileConfirmNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs px-3.5 py-2.5 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-300 font-mono"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isChangingPassword}
+                        className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md flex items-center justify-center gap-2 mt-2"
+                      >
+                        {isChangingPassword ? (
+                          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          "Update Password"
+                        )}
+                      </button>
+                    </form>
                   </div>
 
                   {accountUser?.role === "admin" && (

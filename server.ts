@@ -9,9 +9,29 @@ import fs from "fs";
 import dotenv from "dotenv";
 import { Transaction, TransactionStatus } from "./src/types.js";
 import nodemailer from "nodemailer";
+import admin from "firebase-admin";
+import { getAuth } from "firebase-admin/auth";
 
 // Load environment variables
 dotenv.config();
+
+// Initialize Firebase Admin SDK
+let adminApp: any = null;
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    adminApp = admin.initializeApp({
+      projectId: firebaseConfig.projectId,
+    });
+    console.log("Firebase Admin SDK initialized successfully with config: " + firebaseConfig.projectId);
+  } else {
+    adminApp = admin.initializeApp();
+    console.log("Firebase Admin SDK initialized with default credentials.");
+  }
+} catch (e: any) {
+  console.error("Error initializing Firebase Admin SDK:", e);
+}
 
 const app = express();
 const PORT = 3000;
@@ -601,6 +621,67 @@ function generateMinimalCleanTemplate(tx: Transaction, isReceiver: boolean): str
   return generateModernPaperReceipt(tx, isReceiver);
 }
 
+// Helper to generate a detailed, trust-building plain text representation of the transaction to reduce spam rating
+function generatePlainTextReceipt(tx: Transaction, isReceiver: boolean): string {
+  const formattedDate = new Date(tx.date).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  }) + " " + new Date(tx.date).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
+
+  const role = isReceiver ? "Receiver" : "Sender";
+  const partyName = isReceiver ? tx.receiver.fullName : tx.sender.fullName;
+  const otherPartyLabel = isReceiver ? "Sender" : "Beneficiary";
+  const otherPartyName = isReceiver ? tx.sender.fullName : tx.receiver.fullName;
+  const otherPartyAcc = isReceiver ? tx.sender.accountNumber : tx.receiver.accountNumber;
+  const otherPartySwift = isReceiver ? tx.sender.swiftCode : tx.receiver.swiftCode;
+  const bankName = tx.bankName || "Apex Global";
+
+  return `
+========================================================================
+                      TRANSACTION RECORD NOTIFICATION
+========================================================================
+Financial Institution: ${bankName.toUpperCase()}
+Reference / ID Number: ${tx.id}
+Date and Time:        ${formattedDate}
+Transaction Status:   ${tx.status ? tx.status.toUpperCase() : "COMPLETED"}
+
+This transactional email confirms that your transfer request has been successfully processed and settled. Please review the details of this record below:
+
+YOUR ACCOUNT SUMMARY:
+------------------------------------------------------------------------
+Profile / Role:        ${role}
+Account Holder:        ${partyName}
+
+TRANSACTION DETAILS:
+------------------------------------------------------------------------
+Amount Settled:        ${tx.currency.symbol}${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${tx.currency.code || "USD"})
+Service Type:          Secure Electronic Interbank Transfer
+Processing Status:     Settlement Completed (Cleared)
+
+${otherPartyLabel.toUpperCase()} DETAILS:
+------------------------------------------------------------------------
+Full Name:             ${otherPartyName}
+Account Number:        ${otherPartyAcc || "N/A"}
+Swift/BIC Code:        ${otherPartySwift || "N/A"}
+Receiving Bank:        ${bankName}
+
+------------------------------------------------------------------------
+SECURITY DISCLOSURE AND PRIVACY STATEMENT:
+This is an automated, system-generated transactional communication sent by ${bankName} to notify you of an active transfer linked to your account. 
+If you did not execute or authorize this transaction, or if you suspect unauthorized access, please notify our Security & Fraud Department immediately at: ${tx.supportLink || "support@globalapex.net"}.
+
+To preserve account confidentiality, please do not reply directly to this notice. For additional verification, you may log into your secure online banking dashboard.
+
+Thank you for banking securely with us.
+========================================================================
+`;
+}
+
 // Unified email dispatcher supporting Gmail SMTP via Nodemailer
 async function dispatchEmail(
   toEmail: string,
@@ -608,7 +689,9 @@ async function dispatchEmail(
   bankName: string,
   subject: string,
   htmlContent: string,
-  senderEmail?: string
+  senderEmail?: string,
+  tx?: Transaction,
+  isReceiver?: boolean
 ): Promise<boolean> {
   const gmailUser = process.env.GMAIL_USER;
   const gmailAppPass = process.env.GMAIL_APP_PASS;
@@ -636,7 +719,7 @@ async function dispatchEmail(
         const templateData = JSON.parse(fs.readFileSync(TEMPLATE_FILE, "utf-8"));
         if (templateData.html && templateData.html.trim() !== "") {
           finalHtml = templateData.html;
-          // Basic placeholder replacement (example, needs improvement for real usage)
+          // Basic placeholder replacement
           finalHtml = finalHtml.replace(/{{BANK_NAME}}/g, bankName);
           if (finalHtml.includes("{{bank_logo_image}}")) {
             const logoPath = path.join(DATA_DIR, "bank_logo.txt");
@@ -653,7 +736,7 @@ async function dispatchEmail(
       console.error("Error reading custom template:", e);
     }
 
-    // Extract base64 images from HTML and convert to CID attachments
+    // Extract base64 images from HTML and convert to CID attachments using native buffers for best MIME rendering
     const attachments: any[] = [];
     let processedHtml = finalHtml;
     
@@ -670,16 +753,21 @@ async function dispatchEmail(
       const cid = `logo-${imageCount}@transaction.email`;
       
       attachments.push({
-        path: dataUrl,
-        cid: cid
+        filename: `logo-${imageCount}.${extension}`,
+        content: Buffer.from(base64Data, "base64"),
+        cid: cid,
+        contentType: `image/${extension}`
       });
       
-      processedHtml = processedHtml.replace(fullMatch, `src="cid:${cid}"`);
+      // Safe substitution without regex compiling issues on raw base64 contents
+      processedHtml = processedHtml.split(dataUrl).join(`cid:${cid}`);
       imageCount++;
     }
 
-    // Create simple text version
-    const textContent = `Transaction Notification: ${subject}. Please view this email in an HTML-compatible client.`;
+    // Construct highly detailed plain-text fallback content
+    const textContent = (tx && isReceiver !== undefined)
+      ? generatePlainTextReceipt(tx, isReceiver)
+      : `Transaction Notification: ${subject}.\nReference ID: ${tx ? tx.id : "N/A"}\nFinancial Institution: ${bankName}\n\nPlease check your secure account dashboard for further details.`;
 
     const mailOptions = {
       from: fromAddress,
@@ -692,6 +780,10 @@ async function dispatchEmail(
       headers: {
         "X-Mailer": "Nodemailer Secure Dispatcher",
         "X-Priority": "3", // Normal
+        "Auto-Submitted": "auto-generated", // RFC 3834 auto-generated message marker to improve inbox rates
+        "X-Auto-Response-Suppress": "All", // Suppress autoresponders (OOF replies, read receipts, etc.)
+        "X-Report-Abuse-To": displayEmail,
+        "Feedback-ID": `tx-${tx ? tx.id : "generic"}:${bankName.replace(/\s+/g, "")}:Apex` // Custom headers for Gmail reputations
       },
     };
 
@@ -803,7 +895,9 @@ app.post(["/api/send-transfer", "/send-transfer"], async (req: Request, res: Res
           tx.bankName,
           senderSubject,
           senderHtml,
-          senderEmailToUse
+          senderEmailToUse,
+          tx,
+          false
         );
         results.sender = true;
       } catch (err: any) {
@@ -823,7 +917,9 @@ app.post(["/api/send-transfer", "/send-transfer"], async (req: Request, res: Res
           tx.bankName,
           receiverSubject,
           receiverHtml,
-          senderEmailToUse
+          senderEmailToUse,
+          tx,
+          true
         );
         results.receiver = true;
       } catch (err: any) {
@@ -930,7 +1026,9 @@ app.post(["/api/resend-email", "/resend-email"], async (req: Request, res: Respo
           tx.bankName,
           senderSubject,
           senderHtml,
-          senderEmailToUse
+          senderEmailToUse,
+          tx,
+          false
         );
         results.sender = true;
       } catch (err: any) {
@@ -948,7 +1046,9 @@ app.post(["/api/resend-email", "/resend-email"], async (req: Request, res: Respo
           tx.bankName,
           receiverSubject,
           receiverHtml,
-          senderEmailToUse
+          senderEmailToUse,
+          tx,
+          true
         );
         results.receiver = true;
       } catch (err: any) {
@@ -1197,6 +1297,300 @@ app.post("/api/auth/status", (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("Status error:", err);
     res.status(500).json({ error: "Failed to fetch user status" });
+  }
+});
+
+// Helper to send password reset emails via Gmail SMTP
+async function sendPasswordResetEmail(email: string, defaultPassword: string): Promise<boolean> {
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailAppPass = process.env.GMAIL_APP_PASS;
+
+  if (!gmailUser || !gmailAppPass) {
+    console.warn("Gmail SMTP credentials (GMAIL_USER & GMAIL_APP_PASS) are not configured. Cannot send SMTP password reset email.");
+    return false;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth: {
+      user: gmailUser,
+      pass: gmailAppPass,
+    },
+  });
+
+  const mailOptions = {
+    from: `"Global Secure Networks" <${gmailUser}>`,
+    to: email,
+    subject: "Security Alert: Password Reset to Default",
+    text: `Your account password has been reset to default as requested.\n\nNew Password: ${defaultPassword}\n\nPlease log in and change your password immediately in your profile settings.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #ffffff; color: #2d3748;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #1a202c; margin-bottom: 5px;">Global Secure Networks</h2>
+          <span style="background-color: #fee2e2; color: #dc2626; padding: 6px 12px; border-radius: 9999px; font-size: 11px; font-weight: 800; text-transform: uppercase; tracking-wider: 0.05em; display: inline-block;">Security Notice</span>
+        </div>
+        <p style="font-size: 14px; line-height: 1.5; color: #4a5568;">Dear Operator,</p>
+        <p style="font-size: 14px; line-height: 1.5; color: #4a5568;">Your account password has been reset to default as requested. You can now use the credentials below to log in:</p>
+        <div style="background-color: #f7fafc; padding: 16px; border-radius: 12px; font-family: monospace; font-size: 16px; text-align: center; margin: 24px 0; border: 1px solid #e2e8f0;">
+          <strong>Password:</strong> <span style="color: #2563eb; font-weight: 850; font-size: 18px;">${defaultPassword}</span>
+        </div>
+        <p style="color: #dc2626; font-size: 12px; font-weight: bold; line-height: 1.4;">CRITICAL SECURITY RECOMMENDATION: Please log in and change this default password immediately in your profile dashboard to secure your operator credentials.</p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+        <p style="font-size: 11px; color: #a0aec0; text-align: center; margin: 0;">This is an automated system notification. If you did not request this password reset, please contact support immediately.</p>
+      </div>
+    `,
+  };
+
+  await transporter.sendMail(mailOptions);
+  return true;
+}
+
+// Admin reset user password immediately (effective immediately)
+app.post("/api/admin/reset-password", async (req: Request, res: Response) => {
+  try {
+    const adminEmail = req.headers["admin-email"] as string;
+    if (!isAdminEmail(adminEmail)) {
+      res.status(403).json({ error: "Unauthorized access: Administrator only" });
+      return;
+    }
+
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      res.status(400).json({ error: "Email and new password are required" });
+      return;
+    }
+
+    const emailNorm = email.trim().toLowerCase();
+
+    // 1. Update in Firebase Auth
+    try {
+      const firebaseUser = await getAuth().getUserByEmail(emailNorm);
+      await getAuth().updateUser(firebaseUser.uid, { password: newPassword });
+    } catch (firebaseErr: any) {
+      console.warn("User not found in Firebase Auth or Firebase update failed during admin reset:", firebaseErr);
+    }
+
+    // 2. Update in local users.json
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.email.toLowerCase() === emailNorm);
+    if (userIndex !== -1) {
+      users[userIndex].password = newPassword;
+      saveUsers(users);
+    }
+
+    res.json({ success: true, message: "Password updated successfully and is effective immediately!" });
+  } catch (err: any) {
+    console.error("Admin reset password error:", err);
+    res.status(500).json({ error: err.message || "Failed to reset password" });
+  }
+});
+
+// Synchronize Google user with email/password if they try to log in
+app.post("/api/auth/handle-google-password-sync", async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      res.status(400).json({ error: "Email and password are required" });
+      return;
+    }
+
+    const emailNorm = email.trim().toLowerCase();
+    
+    // Check in Firebase Auth
+    let firebaseUser;
+    try {
+      firebaseUser = await getAuth().getUserByEmail(emailNorm);
+    } catch (fbErr) {
+      // User doesn't exist in Firebase Auth yet, that's fine
+      res.json({ success: false, message: "User does not exist in Firebase Auth" });
+      return;
+    }
+
+    const hasGoogle = firebaseUser.providerData.some(p => p.providerId === 'google.com');
+    if (hasGoogle) {
+      // Update/add password to this Firebase Auth account
+      await getAuth().updateUser(firebaseUser.uid, { password: password });
+
+      // Also ensure they have a record in users.json with this password
+      const users = getUsers();
+      const userIndex = users.findIndex(u => u.email.toLowerCase() === emailNorm);
+      if (userIndex !== -1) {
+        users[userIndex].password = password;
+        saveUsers(users);
+      } else {
+        const isFirstAdmin = isAdminEmail(emailNorm);
+        const newUser = {
+          id: "u_" + Math.random().toString(36).substring(2, 11),
+          email: emailNorm,
+          password: password,
+          role: isFirstAdmin ? "admin" : "user",
+          subscriptionStatus: isFirstAdmin ? "approved" : "none",
+          subscriptionPlan: isFirstAdmin ? "1-Month" : null,
+          accessCode: isFirstAdmin ? "076038" : null,
+          receiptImage: null,
+          paymentSubmittedAt: null,
+          approvedAt: null
+        };
+        users.push(newUser);
+        saveUsers(users);
+      }
+
+      res.json({ success: true, message: "Automatically set password for Google account" });
+      return;
+    }
+
+    res.json({ success: false, message: "User is not registered via Google Auth" });
+  } catch (err: any) {
+    console.error("Password sync error:", err);
+    res.status(500).json({ error: err.message || "Failed to sync password" });
+  }
+});
+
+// Reset password to default (12345) and send via Gmail SMTP
+app.post("/api/auth/reset-to-default", async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ error: "Email address is required" });
+      return;
+    }
+
+    const emailNorm = email.trim().toLowerCase();
+
+    // 1. Get user from Firebase Auth & update password
+    let uid;
+    try {
+      const userRecord = await getAuth().getUserByEmail(emailNorm);
+      uid = userRecord.uid;
+      await getAuth().updateUser(uid, { password: "12345" });
+    } catch (fbErr: any) {
+      res.status(404).json({ error: "No registered account found with this email address in our secure gateway." });
+      return;
+    }
+
+    // 2. Update local users.json password if exists
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.email.toLowerCase() === emailNorm);
+    if (userIndex !== -1) {
+      users[userIndex].password = "12345";
+      saveUsers(users);
+    } else {
+      // Just in case, add them to users.json so they can access endpoints
+      const isFirstAdmin = isAdminEmail(emailNorm);
+      users.push({
+        id: "u_" + Math.random().toString(36).substring(2, 11),
+        email: emailNorm,
+        password: "12345",
+        role: isFirstAdmin ? "admin" : "user",
+        subscriptionStatus: isFirstAdmin ? "approved" : "none",
+        subscriptionPlan: isFirstAdmin ? "1-Month" : null,
+        accessCode: isFirstAdmin ? "076038" : null,
+        receiptImage: null,
+        paymentSubmittedAt: null,
+        approvedAt: null
+      });
+      saveUsers(users);
+    }
+
+    // 3. Dispatch default password via Gmail SMTP
+    await sendPasswordResetEmail(emailNorm, "12345");
+
+    res.json({ success: true, message: "Account password successfully reset to default and dispatched via SMTP." });
+  } catch (err: any) {
+    console.error("Default password reset endpoint error:", err);
+    res.status(500).json({ error: err.message || "An unexpected error occurred during password reset." });
+  }
+});
+
+// Change password (profile page verification of old password)
+app.post("/api/auth/change-password", async (req: Request, res: Response) => {
+  try {
+    const { email, oldPassword, newPassword } = req.body;
+    if (!email || !newPassword) {
+      res.status(400).json({ error: "Email and new password are required." });
+      return;
+    }
+
+    const emailNorm = email.trim().toLowerCase();
+
+    // 1. Get Firebase Auth user
+    let userRecord;
+    try {
+      userRecord = await getAuth().getUserByEmail(emailNorm);
+    } catch (fbErr: any) {
+      res.status(404).json({ error: "User account not found." });
+      return;
+    }
+
+    // Check if user actually has a password provider
+    const hasPassword = userRecord.providerData.some(p => p.providerId === 'password') || !!userRecord.passwordHash;
+
+    if (hasPassword) {
+      if (!oldPassword) {
+        res.status(400).json({ error: "Current password is required to authorize this security change." });
+        return;
+      }
+
+      // Verify old password using Firebase Auth REST API
+      const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+      if (fs.existsSync(configPath)) {
+        const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
+        const apiKey = firebaseConfig.apiKey;
+
+        const verifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`;
+        const verifyRes = await fetch(verifyUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailNorm, password: oldPassword, returnSecureToken: false })
+        });
+
+        if (!verifyRes.ok) {
+          res.status(401).json({ error: "The current password you entered is incorrect." });
+          return;
+        }
+      } else {
+        // Fallback to checking local users.json if config isn't available
+        const users = getUsers();
+        const user = users.find(u => u.email.toLowerCase() === emailNorm);
+        if (user && user.password !== oldPassword) {
+          res.status(401).json({ error: "The current password you entered is incorrect." });
+          return;
+        }
+      }
+    }
+
+    // 2. Update password in Firebase Auth
+    await getAuth().updateUser(userRecord.uid, { password: newPassword });
+
+    // 3. Update password in local users.json
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.email.toLowerCase() === emailNorm);
+    if (userIndex !== -1) {
+      users[userIndex].password = newPassword;
+      saveUsers(users);
+    } else {
+      const isFirstAdmin = isAdminEmail(emailNorm);
+      users.push({
+        id: "u_" + Math.random().toString(36).substring(2, 11),
+        email: emailNorm,
+        password: newPassword,
+        role: isFirstAdmin ? "admin" : "user",
+        subscriptionStatus: isFirstAdmin ? "approved" : "none",
+        subscriptionPlan: isFirstAdmin ? "1-Month" : null,
+        accessCode: isFirstAdmin ? "076038" : null,
+        receiptImage: null,
+        paymentSubmittedAt: null,
+        approvedAt: null
+      });
+      saveUsers(users);
+    }
+
+    res.json({ success: true, message: "Your password has been changed successfully!" });
+  } catch (err: any) {
+    console.error("Change password endpoint error:", err);
+    res.status(500).json({ error: err.message || "Failed to update profile password." });
   }
 });
 

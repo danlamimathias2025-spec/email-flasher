@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   CheckCircle, Copy, AlertCircle, Printer, XCircle, RefreshCw, Trash2, History, ArrowUpRight,
-  Diamond, Zap, Hexagon, Layers, Coins, CircleDot, Cpu, Search, ChevronDown, Building
+  Diamond, Zap, Hexagon, Layers, Coins, CircleDot, Cpu, Search, ChevronDown, Building,
+  Download, Image
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -231,9 +232,44 @@ const ReceiptDisplay = ({
   onSave: () => void; 
   isSaved: boolean; 
 }) => {
+  const receiptRef = React.useRef<HTMLDivElement>(null);
+
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard!`);
+  };
+
+  const handleSaveAsImage = async () => {
+    if (!receiptRef.current) return;
+    
+    const toastId = toast.loading("Generating high-quality receipt image...");
+    try {
+      const { toPng } = await import('html-to-image');
+      
+      const dataUrl = await toPng(receiptRef.current, {
+        quality: 1.0,
+        pixelRatio: 3, // High-DPI crisp capture
+        backgroundColor: '#181e25',
+        filter: (node: any) => {
+          if (node.classList && (node.classList.contains('no-print') || node.classList.contains('hide-in-image'))) {
+            return false;
+          }
+          return true;
+        }
+      });
+      
+      const link = document.createElement('a');
+      const cleanPlatform = (data.platform || 'Crypto').trim().replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `${cleanPlatform}_Receipt_${data.amount}_${data.crypto}_${data.txid.slice(0, 8)}.png`;
+      link.download = filename;
+      link.href = dataUrl;
+      link.click();
+      
+      toast.success("Receipt image downloaded successfully!", { id: toastId });
+    } catch (error: any) {
+      console.error("Error generating receipt image:", error);
+      toast.error(`Failed to generate image: ${error.message || error}`, { id: toastId });
+    }
   };
 
   const sign = data.type === 'deposit' ? '+' : '-';
@@ -259,67 +295,73 @@ const ReceiptDisplay = ({
         animate={{ opacity: 1 }}
         className="flex flex-col flex-1 max-w-md mx-auto w-full p-6 pt-12 print-full"
       >
-        {/* Amount Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-[42px] font-bold text-white mb-2 tracking-tight">
-            {displayAmount}
-          </h1>
-          <StatusBadge status={data.status} />
-          
-          <p className="text-[#848e9c] mt-8 text-[15px] leading-relaxed font-medium px-4">
-            {data.type === 'deposit' 
-              ? `Crypto has arrived in your ${data.platform} account. View your spot account balance for more details.`
-              : `Crypto has been sent from your ${data.platform} account. Please contact the recipient platform for your transaction receipt.`}
-          </p>
-        </div>
-
-        {/* Divider */}
-        <div className="border-t border-[#2b3139] mb-10"></div>
-
-        {/* Details Table */}
-        <div className="space-y-8 text-[16px]">
-          <div className="flex justify-between items-center">
-            <span className="text-[#848e9c] font-semibold">Network</span>
-            <span className="text-white font-bold">{data.network}</span>
-          </div>
-
-          <div className="flex justify-between items-start gap-4">
-            <span className="text-[#848e9c] font-semibold shrink-0">Address</span>
-            <div className="flex items-start gap-2 justify-end">
-              <span className="text-white font-bold break-all text-right leading-tight max-w-[240px]">
-                {data.address}
-              </span>
-              <button onClick={() => handleCopy(data.address, "Address")} className="no-print shrink-0 mt-0.5">
-                <Copy className="w-5 h-5 text-[#848e9c] hover:text-white" />
-              </button>
+        {/* Receipt Container to capture as Image */}
+        <div ref={receiptRef} className="bg-[#181e25] p-4 rounded-3xl">
+          {/* Outer receipt card with high-contrast borders and premium appearance */}
+          <div className="bg-[#181e25] text-[#eaecef] p-6 rounded-2xl border border-[#2b3139]/50 shadow-2xl">
+            {/* Amount Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-[38px] font-bold text-white mb-2 tracking-tight">
+                {displayAmount}
+              </h1>
+              <StatusBadge status={data.status} />
+              
+              <p className="text-[#848e9c] mt-6 text-[14px] leading-relaxed font-medium px-2">
+                {data.type === 'deposit' 
+                  ? `Crypto has arrived in your ${data.platform} account. View your spot account balance for more details.`
+                  : `Crypto has been sent from your ${data.platform} account. Please contact the recipient platform for your transaction receipt.`}
+              </p>
             </div>
-          </div>
 
-          <div className="flex justify-between items-start gap-4">
-            <span className="text-[#848e9c] font-semibold shrink-0">Txid</span>
-            <div className="flex items-start gap-2 justify-end">
-              <span className="text-white font-bold break-all text-right leading-tight max-w-[240px] underline decoration-slate-500 underline-offset-4">
-                {data.txid}
-              </span>
-              <button onClick={() => handleCopy(data.txid, "Txid")} className="no-print shrink-0 mt-0.5">
-                <Copy className="w-5 h-5 text-[#848e9c] hover:text-white" />
-              </button>
+            {/* Divider */}
+            <div className="border-t border-[#2b3139] mb-8"></div>
+
+            {/* Details Table */}
+            <div className="space-y-6 text-[15px]">
+              <div className="flex justify-between items-center">
+                <span className="text-[#848e9c] font-semibold">Network</span>
+                <span className="text-white font-bold">{data.network}</span>
+              </div>
+
+              <div className="flex justify-between items-start gap-4">
+                <span className="text-[#848e9c] font-semibold shrink-0">Address</span>
+                <div className="flex items-start gap-2 justify-end">
+                  <span className="text-white font-bold break-all text-right leading-tight max-w-[200px]">
+                    {data.address}
+                  </span>
+                  <button onClick={() => handleCopy(data.address, "Address")} className="no-print shrink-0 mt-0.5">
+                    <Copy className="w-5 h-5 text-[#848e9c] hover:text-white" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-start gap-4">
+                <span className="text-[#848e9c] font-semibold shrink-0">Txid</span>
+                <div className="flex items-start gap-2 justify-end">
+                  <span className="text-white font-bold break-all text-right leading-tight max-w-[200px] underline decoration-slate-500 underline-offset-4">
+                    {data.txid}
+                  </span>
+                  <button onClick={() => handleCopy(data.txid, "Txid")} className="no-print shrink-0 mt-0.5">
+                    <Copy className="w-5 h-5 text-[#848e9c] hover:text-white" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-[#848e9c] font-semibold">Wallet</span>
+                <span className="text-white font-bold">Spot Wallet</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-[#848e9c] font-semibold">Date</span>
+                <span className="text-white font-bold tracking-tight">{data.date.replace('T', ' ')}</span>
+              </div>
             </div>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-[#848e9c] font-semibold">Wallet</span>
-            <span className="text-white font-bold">Spot Wallet</span>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-[#848e9c] font-semibold">Date</span>
-            <span className="text-white font-bold tracking-tight">{data.date.replace('T', ' ')}</span>
           </div>
         </div>
 
         {/* Action Controls */}
-        <div className="mt-16 space-y-4 no-print pb-10">
+        <div className="mt-10 space-y-4 no-print pb-10">
           {!isSaved ? (
             <button 
               onClick={onSave} 
@@ -332,6 +374,14 @@ const ReceiptDisplay = ({
               ✓ Saved to History
             </div>
           )}
+          
+          <button 
+            onClick={handleSaveAsImage} 
+            className="w-full py-4 bg-[#0ecb81] hover:bg-[#0cb271] text-[#181e25] rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+          >
+            <Image className="w-5 h-5" /> Save as Image (PNG)
+          </button>
+
           <button 
             onClick={() => window.print()} 
             className="w-full py-4 bg-[#2b3139] hover:bg-[#363e48] text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
