@@ -43,8 +43,31 @@ app.use(express.json({ limit: "50mb" }));
 
 // Normalize Vercel Serverless routing variations (ensure /api/... is matched properly)
 app.use((req, res, next) => {
-  if (process.env.VERCEL && req.url && !req.url.startsWith("/api/")) {
-    req.url = "/api" + (req.url.startsWith("/") ? req.url : "/" + req.url);
+  if (process.env.VERCEL) {
+    let url = req.url || "";
+    const [pathPart, queryPart] = url.split("?");
+    let normalizedPath = pathPart;
+
+    // Strip Vercel specific serverless function path prefix variations
+    if (normalizedPath.startsWith("/api/index.ts")) {
+      normalizedPath = "/api" + normalizedPath.substring("/api/index.ts".length);
+    } else if (normalizedPath.startsWith("/api/index")) {
+      normalizedPath = "/api" + normalizedPath.substring("/api/index".length);
+    } else if (normalizedPath.startsWith("/index.ts")) {
+      normalizedPath = "/api" + normalizedPath.substring("/index.ts".length);
+    }
+
+    // Ensure path starts with /api/
+    if (!normalizedPath.startsWith("/api/")) {
+      if (normalizedPath === "/api") {
+        normalizedPath = "/api/";
+      } else {
+        const cleanPath = normalizedPath.startsWith("/") ? normalizedPath : "/" + normalizedPath;
+        normalizedPath = "/api" + cleanPath;
+      }
+    }
+
+    req.url = normalizedPath + (queryPart ? "?" + queryPart : "");
   }
   next();
 });
