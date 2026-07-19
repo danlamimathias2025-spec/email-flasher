@@ -293,69 +293,77 @@ const ReceiptDisplay = ({
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="flex flex-col flex-1 max-w-md mx-auto w-full p-6 pt-12 print-full"
+        className="flex flex-col flex-1 max-w-md mx-auto w-full p-6 pt-12 print-full items-center"
       >
-        {/* Receipt Container to capture as Image */}
-        <div ref={receiptRef} className="bg-[#181e25] p-4 rounded-3xl">
-          {/* Outer receipt card with high-contrast borders and premium appearance */}
-          <div className="bg-[#181e25] text-[#eaecef] p-6 rounded-2xl border border-[#2b3139]/50 shadow-2xl">
-            {/* Amount Header */}
-            <div className="text-center mb-8">
-              <h1 className="text-[38px] font-bold text-white mb-2 tracking-tight">
-                {displayAmount}
-              </h1>
-              <StatusBadge status={data.status} />
-              
-              <p className="text-[#848e9c] mt-6 text-[14px] leading-relaxed font-medium px-2">
-                {data.type === 'deposit' 
-                  ? `Crypto has arrived in your ${data.platform} account. View your spot account balance for more details.`
-                  : `Crypto has been sent from your ${data.platform} account. Please contact the recipient platform for your transaction receipt.`}
-              </p>
+        {/* Receipt Container to capture as Image: styled exactly to match the uploaded image's size and layout */}
+        <div 
+          ref={receiptRef} 
+          className="w-[390px] bg-[#181e25] text-[#eaecef] p-8 rounded-[32px] shadow-2xl flex flex-col justify-start font-sans"
+        >
+          {/* Amount Header */}
+          <div className="text-center pt-6 mb-6">
+            <h1 className="text-[34px] font-bold text-white mb-1.5 tracking-tight">
+              {displayAmount}
+            </h1>
+            <StatusBadge status={data.status} />
+            
+            <p className="text-[#848e9c] mt-6 text-xs leading-relaxed font-semibold px-2 text-center">
+              {data.type === 'deposit' 
+                ? `Crypto has arrived in your ${data.platform} account. View your spot account balance for more details.`
+                : `Crypto has been sent from your ${data.platform} account. Please contact the recipient platform for your transaction receipt.`}
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-[#2b3139]/40 my-6"></div>
+
+          {/* Details Table */}
+          <div className="space-y-5">
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-[#848e9c] font-semibold text-xs">Network</span>
+              <span className="text-white font-bold text-xs uppercase">{data.network}</span>
             </div>
 
-            {/* Divider */}
-            <div className="border-t border-[#2b3139] mb-8"></div>
-
-            {/* Details Table */}
-            <div className="space-y-6 text-[15px]">
-              <div className="flex justify-between items-center">
-                <span className="text-[#848e9c] font-semibold">Network</span>
-                <span className="text-white font-bold">{data.network}</span>
+            <div className="flex justify-between items-start gap-4 py-0.5">
+              <span className="text-[#848e9c] font-semibold text-xs shrink-0 pt-0.5">Address</span>
+              <div className="flex items-center gap-1.5 justify-end max-w-[70%]">
+                <span className="text-white font-bold text-xs text-right break-all leading-normal tracking-tight">
+                  {data.address}
+                </span>
+                <button 
+                  onClick={() => handleCopy(data.address, "Address")} 
+                  className="shrink-0 text-[#848e9c] hover:text-white transition-colors cursor-pointer"
+                  title="Copy Address"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
               </div>
+            </div>
 
-              <div className="flex justify-between items-start gap-4">
-                <span className="text-[#848e9c] font-semibold shrink-0">Address</span>
-                <div className="flex items-start gap-2 justify-end">
-                  <span className="text-white font-bold break-all text-right leading-tight max-w-[200px]">
-                    {data.address}
-                  </span>
-                  <button onClick={() => handleCopy(data.address, "Address")} className="no-print shrink-0 mt-0.5">
-                    <Copy className="w-5 h-5 text-[#848e9c] hover:text-white" />
-                  </button>
-                </div>
+            <div className="flex justify-between items-start gap-4 py-0.5">
+              <span className="text-[#848e9c] font-semibold text-xs shrink-0 pt-0.5">Txid</span>
+              <div className="flex items-center gap-1.5 justify-end max-w-[70%]">
+                <span className="text-white font-bold text-xs text-right break-all leading-normal tracking-tight underline decoration-slate-500 underline-offset-4 decoration-1">
+                  {data.txid}
+                </span>
+                <button 
+                  onClick={() => handleCopy(data.txid, "Txid")} 
+                  className="shrink-0 text-[#848e9c] hover:text-white transition-colors cursor-pointer"
+                  title="Copy Txid"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
               </div>
+            </div>
 
-              <div className="flex justify-between items-start gap-4">
-                <span className="text-[#848e9c] font-semibold shrink-0">Txid</span>
-                <div className="flex items-start gap-2 justify-end">
-                  <span className="text-white font-bold break-all text-right leading-tight max-w-[200px] underline decoration-slate-500 underline-offset-4">
-                    {data.txid}
-                  </span>
-                  <button onClick={() => handleCopy(data.txid, "Txid")} className="no-print shrink-0 mt-0.5">
-                    <Copy className="w-5 h-5 text-[#848e9c] hover:text-white" />
-                  </button>
-                </div>
-              </div>
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-[#848e9c] font-semibold text-xs">Wallet</span>
+              <span className="text-white font-bold text-xs">Spot Wallet</span>
+            </div>
 
-              <div className="flex justify-between items-center">
-                <span className="text-[#848e9c] font-semibold">Wallet</span>
-                <span className="text-white font-bold">Spot Wallet</span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-[#848e9c] font-semibold">Date</span>
-                <span className="text-white font-bold tracking-tight">{data.date.replace('T', ' ')}</span>
-              </div>
+            <div className="flex justify-between items-center py-0.5">
+              <span className="text-[#848e9c] font-semibold text-xs">Date</span>
+              <span className="text-white font-bold text-xs tracking-tight">{data.date.replace('T', ' ')}</span>
             </div>
           </div>
         </div>

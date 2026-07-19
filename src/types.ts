@@ -44,6 +44,7 @@ export interface Transaction {
   sender: SenderInfo;
   receiver: ReceiverInfo;
   emailTemplate: EmailTemplateType;
+  language?: string; // e.g. 'en', 'es', 'fr'
   createdAt: string;
   emailsSent?: {
     sender: boolean;

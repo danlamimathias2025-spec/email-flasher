@@ -6,6 +6,7 @@ import {
   Upload, X, Image as ImageIcon
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { SearchableLanguageSelect } from './SearchableLanguageSelect';
 
 const CRYPTO_CURRENCIES = [
   "BTC", "ETH", "USDT", "BNB", "SOL", "XRP", "USDC", "ADA", "AVAX", "DOGE", "TRX", "DOT", "LINK", "MATIC", "LTC", 
@@ -28,7 +29,8 @@ export const CryptoEmailTransfer = () => {
     platform: 'Binance',
     status: 'Successful',
     supportLink: 'support@crypto.com',
-    warningMessage: ''
+    warningMessage: '',
+    language: 'en'
   });
   const [logoImage, setLogoImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -232,6 +234,17 @@ export const CryptoEmailTransfer = () => {
               className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               placeholder="e.g. https://support.binance.com or support@binance.com"
               required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <span>🌐</span> Email Language
+            </label>
+            <SearchableLanguageSelect
+              value={formData.language}
+              onChange={(value) => setFormData({ ...formData, language: value })}
+              className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
           </div>
         </div>

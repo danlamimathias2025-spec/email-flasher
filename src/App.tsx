@@ -49,7 +49,10 @@ import {
   Settings,
   Key,
   Printer,
-  Building2 as BuildingIcon
+  Building2 as BuildingIcon,
+  Eye,
+  EyeOff,
+  Info
 } from "lucide-react";
 import { auth, db, googleProvider } from "./lib/firebase";
 import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
@@ -87,6 +90,8 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authConfirmPassword, setAuthConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [authError, setAuthError] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
@@ -800,18 +805,33 @@ export default function App() {
             <div className="grid grid-cols-2 bg-slate-950 border border-slate-800/60 p-1 rounded-xl font-mono">
               <button
                 type="button"
-                onClick={() => { setAuthTab("login"); setAuthError(""); }}
+                onClick={() => { setAuthTab("login"); setAuthError(""); setShowPassword(false); setShowConfirmPassword(false); }}
                 className={`py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${authTab === "login" ? "bg-slate-850 text-white shadow" : "text-slate-400 hover:text-white"}`}
               >
                 Sign In
               </button>
               <button
                 type="button"
-                onClick={() => { setAuthTab("register"); setAuthError(""); }}
+                onClick={() => { setAuthTab("register"); setAuthError(""); setShowPassword(false); setShowConfirmPassword(false); }}
                 className={`py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${authTab === "register" ? "bg-slate-850 text-white shadow" : "text-slate-400 hover:text-white"}`}
               >
                 Register
               </button>
+            </div>
+
+            {/* Prompt Notice advocating Google Authentication */}
+            <div className="p-4 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/25 rounded-2xl flex items-start gap-3 text-left">
+              <div className="p-1.5 bg-blue-500/20 text-blue-400 rounded-lg shrink-0 mt-0.5">
+                <Info className="h-3.5 w-3.5" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-mono text-blue-300 uppercase tracking-wider font-bold">
+                  Recommended Method
+                </p>
+                <p className="text-[11px] text-slate-300 leading-normal font-medium">
+                  We strongly advise using <span className="text-white font-bold">Google Sign-In / Sign-Up</span> instead of standard email and password. It is safer, instant, and links automatically with your personal workspace.
+                </p>
+              </div>
             </div>
 
             {/* Error Message */}
@@ -838,27 +858,45 @@ export default function App() {
 
               <div className="space-y-1 text-left">
                 <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Password</label>
-                <input
-                  type="password"
-                  required
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs pl-4 pr-10 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors focus:outline-none cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
               {authTab === "register" && (
                 <div className="space-y-1 text-left">
                   <label className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">Confirm Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={authConfirmPassword}
-                    onChange={(e) => setAuthConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs px-4 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      required
+                      value={authConfirmPassword}
+                      onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-100 text-xs pl-4 pr-10 py-3 rounded-xl outline-none transition-all placeholder:text-slate-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors focus:outline-none cursor-pointer"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
               )}
 

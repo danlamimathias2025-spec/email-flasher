@@ -29,6 +29,7 @@ import {
 import { toast } from "react-hot-toast";
 import { Transaction, Currency, TransactionStatus } from "../types";
 import { ALL_CURRENCIES } from "../utils/currencies";
+import { SearchableLanguageSelect } from "./SearchableLanguageSelect";
 import CurrencySelector from "./CurrencySelector";
 import { safeFetchJson, addLocalTransaction } from "../utils/api";
 
@@ -65,6 +66,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
   const [status, setStatus] = useState<TransactionStatus>("successful");
   const [description, setDescription] = useState("Corporate Invoice Payment");
   const [note, setNote] = useState("Invoice #CN-2026-904");
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
 
   // Step 2: Sender Details
   const [senderName, setSenderName] = useState("Sarah Jenkins");
@@ -149,6 +151,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
               redBoxMessage,
             },
             emailTemplate: "modern_bank",
+            language: selectedLanguage,
             createdAt: new Date().toISOString(),
           };
 
@@ -199,6 +202,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
     receiverAccountNumber,
     receiverSwiftCode,
     redBoxMessage,
+    selectedLanguage,
   ]);
 
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -412,6 +416,7 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
         redBoxMessage
       },
       emailTemplate: "modern_bank",
+      language: selectedLanguage,
       createdAt: new Date().toISOString()
     };
 
@@ -1201,6 +1206,18 @@ export default function TransferWizard({ onTransferSuccess, isLocalMode = false 
                   className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition bg-slate-50/50"
                 />
               </div>
+            </div>
+
+            {/* Email Language Selection */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                Email Language *
+              </label>
+              <SearchableLanguageSelect
+                value={selectedLanguage}
+                onChange={(value) => setSelectedLanguage(value)}
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 bg-slate-50/50 font-semibold text-slate-800"
+              />
             </div>
           </div>
         )}
