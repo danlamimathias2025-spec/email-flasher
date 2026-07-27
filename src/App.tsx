@@ -55,7 +55,7 @@ import {
   Info
 } from "lucide-react";
 import { auth, db, googleProvider } from "./lib/firebase";
-import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, onSnapshot } from "firebase/firestore";
 import { Toaster, toast } from "react-hot-toast";
 import { Transaction, TransactionStatus } from "./types";
@@ -106,7 +106,6 @@ export default function App() {
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminTab, setAdminTab] = useState<"users" | "payments" | "email_template">("users");
   const [editingUser, setEditingUser] = useState<any | null>(null);
-  const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState("user");
   const [editStatus, setEditStatus] = useState("none");
   const [editPlan, setEditPlan] = useState("");
@@ -242,7 +241,15 @@ export default function App() {
               const data = { id: user.uid, ...newUser };
               setAccountUser(data);
               localStorage.setItem("account_user", JSON.stringify(data));
+            }).catch(err => {
+              console.error("Critical: Failed to initialize user profile in Firestore:", err);
+              setAuthError("Failed to initialize your account profile. Please try again.");
             });
+          }
+        }, (error) => {
+          console.error("Firestore Snapshot error:", error);
+          if (error.message.includes("permission")) {
+            setAuthError("Account permission error. Please contact support.");
           }
         });
       } else {
@@ -331,6 +338,24 @@ export default function App() {
       toast.success("Signed in successfully!");
     } catch (err: any) {
       setAuthError(err.message || "Failed to sign in");
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!authEmail.trim()) {
+      setAuthError("Please enter your email address to reset password.");
+      return;
+    }
+    setIsAuthLoading(true);
+    setAuthError("");
+    try {
+      await sendPasswordResetEmail(auth, authEmail.trim());
+      toast.success("Password reset email sent! Check your inbox.");
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      setAuthError(err.message || "Failed to send reset email.");
     } finally {
       setIsAuthLoading(false);
     }
@@ -875,6 +900,17 @@ export default function App() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                {authTab === "login" && (
+                  <div className="flex justify-end mt-1">
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      className="text-[10px] font-mono text-blue-400 hover:text-blue-300 uppercase tracking-widest font-bold cursor-pointer transition-colors"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                )}
               </div>
 
               {authTab === "register" && (
@@ -1553,7 +1589,6 @@ export default function App() {
                                   type="button"
                                   onClick={() => {
                                     setEditingUser(user);
-                                    setEditPassword("");
                                     setEditRole(user.role || "user");
                                     setEditStatus(user.subscriptionStatus || "none");
                                     setEditPlan(user.subscriptionPlan || "");
@@ -1785,19 +1820,6 @@ export default function App() {
                 <p className="text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl">
                   {editingUser.email}
                 </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                  New Password (leave blank to keep current)
-                </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={editPassword}
-                  onChange={(e) => setEditPassword(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-slate-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none transition-all placeholder:text-slate-400 font-mono"
-                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

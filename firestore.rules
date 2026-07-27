@@ -7,11 +7,15 @@ service cloud.firestore {
     }
 
     function isSignedIn() {
-      return request.auth != null && request.auth.token.email_verified == true;
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
     }
 
     function isAdmin() {
-      return isSignedIn() && (request.auth.token.email == 'mathiasdanlami2025@gmail.com' || request.auth.token.email == 'danlamimathias2025@gmail.com');
+      return isEmailVerified() && (request.auth.token.email == 'mathiasdanlami2025@gmail.com' || request.auth.token.email == 'danlamimathias2025@gmail.com');
     }
 
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches("^[a-zA-Z0-9_\\-]+$"); }

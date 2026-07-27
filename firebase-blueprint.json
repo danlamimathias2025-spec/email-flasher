@@ -7,7 +7,6 @@
       "properties": {
         "id": { "type": "string" },
         "email": { "type": "string" },
-        "password": { "type": "string" },
         "role": { "type": "string" },
         "subscriptionStatus": { "type": "string" },
         "subscriptionPlan": { "type": "string" },
@@ -16,7 +15,7 @@
         "paymentSubmittedAt": { "type": "string" },
         "approvedAt": { "type": "string" }
       },
-      "required": ["id", "email", "password", "role"]
+      "required": ["id", "email", "role"]
     },
     "Transaction": {
       "title": "Transaction",
