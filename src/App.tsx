@@ -84,7 +84,11 @@ export default function App() {
   // Account Authentication State
   const [accountUser, setAccountUser] = useState<any>(() => {
     const stored = localStorage.getItem("account_user");
-    return stored ? JSON.parse(stored) : null;
+    try {
+      return (stored && stored !== "null" && stored !== "undefined") ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
   });
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [authEmail, setAuthEmail] = useState("");
@@ -282,7 +286,24 @@ export default function App() {
     setIsAuthLoading(true);
     setAuthError("");
     try {
-      await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+      const userCredential = await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+      const user = userCredential.user;
+      
+      // Initialize user profile in Firestore immediately
+      const isEmailAdmin = isAdminEmail(user.email || undefined);
+      const newUser = {
+        email: user.email,
+        role: isEmailAdmin ? 'admin' : 'user',
+        subscriptionStatus: isEmailAdmin ? 'approved' : 'none',
+        subscriptionPlan: isEmailAdmin ? '1-Month' : null
+      };
+      
+      await setDoc(doc(db, 'users', user.uid), newUser);
+      
+      const data = { id: user.uid, ...newUser };
+      setAccountUser(data);
+      localStorage.setItem("account_user", JSON.stringify(data));
+      
       toast.success("Account registered successfully!");
       setAuthEmail("");
       setAuthPassword("");
@@ -312,7 +333,32 @@ export default function App() {
     setIsAuthLoading(true);
     setAuthError("");
     try {
-      await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+      const userCredential = await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+      const user = userCredential.user;
+      
+      // Fetch user profile immediately
+      const userRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(userRef);
+      
+      if (docSnap.exists()) {
+        const data = { id: docSnap.id, ...docSnap.data() };
+        setAccountUser(data);
+        localStorage.setItem("account_user", JSON.stringify(data));
+      } else {
+        // Fallback: Create if missing
+        const isEmailAdmin = isAdminEmail(user.email || undefined);
+        const newUser = {
+          email: user.email,
+          role: isEmailAdmin ? 'admin' : 'user',
+          subscriptionStatus: isEmailAdmin ? 'approved' : 'none',
+          subscriptionPlan: isEmailAdmin ? '1-Month' : null
+        };
+        await setDoc(userRef, newUser);
+        const data = { id: user.uid, ...newUser };
+        setAccountUser(data);
+        localStorage.setItem("account_user", JSON.stringify(data));
+      }
+      
       toast.success("Signed in successfully!");
       setAuthEmail("");
       setAuthPassword("");
@@ -334,9 +380,35 @@ export default function App() {
     setIsAuthLoading(true);
     setAuthError("");
     try {
-      await signInWithPopup(auth, googleProvider);
+      const userCredential = await signInWithPopup(auth, googleProvider);
+      const user = userCredential.user;
+
+      // Fetch user profile immediately
+      const userRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(userRef);
+      
+      if (docSnap.exists()) {
+        const data = { id: docSnap.id, ...docSnap.data() };
+        setAccountUser(data);
+        localStorage.setItem("account_user", JSON.stringify(data));
+      } else {
+        // Initialize if first time
+        const isEmailAdmin = isAdminEmail(user.email || undefined);
+        const newUser = {
+          email: user.email,
+          role: isEmailAdmin ? 'admin' : 'user',
+          subscriptionStatus: isEmailAdmin ? 'approved' : 'none',
+          subscriptionPlan: isEmailAdmin ? '1-Month' : null
+        };
+        await setDoc(userRef, newUser);
+        const data = { id: user.uid, ...newUser };
+        setAccountUser(data);
+        localStorage.setItem("account_user", JSON.stringify(data));
+      }
+      
       toast.success("Signed in successfully!");
     } catch (err: any) {
+      console.error("Google login error:", err);
       setAuthError(err.message || "Failed to sign in");
     } finally {
       setIsAuthLoading(false);

@@ -15,7 +15,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isEmailVerified() && (request.auth.token.email == 'mathiasdanlami2025@gmail.com' || request.auth.token.email == 'danlamimathias2025@gmail.com');
+      return isSignedIn() && (request.auth.token.email == 'mathiasdanlami2025@gmail.com' || request.auth.token.email == 'danlamimathias2025@gmail.com');
     }
 
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches("^[a-zA-Z0-9_\\-]+$"); }
